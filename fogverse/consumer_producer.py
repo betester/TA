@@ -82,8 +82,9 @@ class AIOKafkaProducer(AbstractProducer):
         await self.producer.start()
 
     async def _send(self, data, *args, topic=None, headers=None, key=None, **kwargs):
-        if topic is None: raise ValueError('Topic should not be None.')
-        return await self.producer.send(topic,
+        if topic is None: 
+            raise ValueError('Topic should not be None.')
+        return self.producer.send_and_wait(topic,
                                         *args,
                                         value=data,
                                         key=key,

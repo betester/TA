@@ -6,22 +6,38 @@ import asyncio
 class MyConsumer(Consumer):
     
     def __init__(self):
-        self.consumer_topic = ['test']
-        self.consumer_servers = ["localhost:9092","localhost:9093","localhost:9094"]
-        self._consumer_conf = {
-            'group_id': str(uuid4())
-        }
+        self.consumer_topic = ['example-topic']
+        self.consumer_servers = ["localhost:9092"]
+        self.always_read_last = False
+        self.consumer_conf = {'group_id': str(uuid4())}
         Consumer.__init__(self)
-
+    
 class MyProducer(Producer):
 
-    def __init__(self):
-        self.producer_topic = "test"
-        self.consumer_servers = ["localhost:9092","localhost:9093","localhost:9094"]
+    def __init__(self, consumer: MyConsumer):
+        self.producer_topic = "example-topic"
+        self.consumer: MyConsumer = consumer
+        self.producer_servers = ["localhost:9092"]
+        self.message = {
+            "key": None
+        }
         Producer.__init__(self)
 
+    async def receive(self):
+        return self.consumer.receive()
+        
+    
+
+    async def _after_receive(self, message):
+        print(message)
+        print("GAK MASUK AKAL")
+
 async def main():
-    tasks  = [MyConsumer().run(), MyProducer().run()]
+    consumer = MyConsumer()
+    producer = MyProducer(consumer)
+    tasks  = [consumer.run(), producer.run()]
+    await producer.send("Hello")
+    print("Finish sending")
     try:
         await asyncio.gather(*tasks)
     except Exception as e:
@@ -31,4 +47,8 @@ async def main():
 
 
 if __name__ == '__main__':
-    asyncio.run(main())
+    loop = asyncio.get_event_loop()
+    try:
+        loop.run_until_complete(main())
+    finally:
+        loop.close()

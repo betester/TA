@@ -38,7 +38,9 @@ class Runnable:
             while True:
                 _call_func(self, '_before_receive')
                 self.message = await self.receive()
-                if self.message is None: continue
+                if self.message is None:
+                    print("Somehow none")
+                    continue
                 _call_func(self, '_after_receive', args=(self.message,))
 
                 # kafka and opencv consumer compatibility
