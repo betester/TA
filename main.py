@@ -1,43 +1,57 @@
 from fogverse import Consumer, Producer
-from uuid import uuid4 
 import asyncio
 
 
 class MyConsumer(Consumer):
-    
+  
     def __init__(self):
         self.consumer_topic = ['example-topic']
-        self.consumer_servers = ["localhost:9092"]
-        self.always_read_last = False
-        self.consumer_conf = {'group_id': str(uuid4())}
+        self.consumer_servers = "localhost:9092" 
         Consumer.__init__(self)
+    
+    def _before_start(self):
+        print("Starting consumer")
+
+    def _after_start(self):
+        print("Consumer Started")
+    
+    async def _send(self, data, *args, **kwargs) -> asyncio.Future:
+        print(data, args, kwargs)
+        return data
+
+    
     
 class MyProducer(Producer):
 
-    def __init__(self, consumer: MyConsumer):
+    def __init__(self, consumer: Consumer):
         self.producer_topic = "example-topic"
-        self.consumer: MyConsumer = consumer
         self.producer_servers = ["localhost:9092"]
-        self.message = {
-            "key": None
-        }
+        self.message = None
+        self.consumer: Consumer = consumer
         Producer.__init__(self)
 
-    async def receive(self):
-        return self.consumer.receive()
-        
-    
+    async def _after_start(self):
+        await asyncio.sleep(3)
+        await self.send(b'Hello World')
+        print("Message sent!")
 
-    async def _after_receive(self, message):
+    def _before_receive(self):
+        print("initiating receive")
+    
+    def _after_receive(self, message):
+        print("Message received!")
         print(message)
-        print("GAK MASUK AKAL")
+    
+    async def receive(self):
+        return await self.consumer.receive() 
+    
+    def callback(self, record_metadata, *args, **kwargs):
+        print(record_metadata, args, kwargs)
 
 async def main():
     consumer = MyConsumer()
     producer = MyProducer(consumer)
-    tasks  = [consumer.run(), producer.run()]
-    await producer.send("Hello")
-    print("Finish sending")
+    tasks = [ consumer.run(), producer.run()]
     try:
         await asyncio.gather(*tasks)
     except Exception as e:

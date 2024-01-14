@@ -15,6 +15,7 @@ async def consume():
         # Consume messages from the 'example-topic'
         async for message in consumer:
             print(f"Received message: {message.value.decode('utf-8')}")
+        print("test")
     finally:
         # Gracefully stop the consumer
         await consumer.stop()
