@@ -43,7 +43,8 @@ class AbstractConsumer:
 
 class AbstractProducer:
     def encode(self, data):
-        if isinstance(data, bytes): return data
+        if isinstance(data, bytes): 
+            return data
         if not getattr(self, 'auto_encode', True):
             return data
         if isinstance(data, str):
@@ -63,7 +64,7 @@ class AbstractProducer:
         pass
 
     async def close_producer(self):
-        pass
+        raise NotImplementedError
 
     async def _send(self, data, *args, **kwargs) -> asyncio.Future:
         raise NotImplementedError

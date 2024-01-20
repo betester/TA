@@ -13,26 +13,31 @@ from .fogverse_logging import FogVerseLogging
 from .base import AbstractConsumer, AbstractProducer
 
 class AIOKafkaConsumer(AbstractConsumer):
-    def __init__(self, loop=None):
+    '''
+    consumer_servers has to be url to kafka servers, e.g [localhost:9092]
+    '''
+    def __init__(self, 
+                 consumer_servers: list[str], 
+                 group_id: str,
+                 client_id: str="",
+                 consumer_conf={}, 
+                 consumer_topic: list[str]=[], 
+                 topic_pattern=None, 
+                 loop=None
+                 ):
         self._loop = loop or asyncio.get_event_loop()
-        self._topic_pattern = get_config('TOPIC_PATTERN', self)
-
-        self._consumer_topic = get_config('CONSUMER_TOPIC', self, [])
-        if isinstance(self._consumer_topic, str):
-            self._consumer_topic = self._consumer_topic.split(',')
-
-        self._consumer_servers = get_config('CONSUMER_SERVERS', self,
-                                             'localhost')
-        self.consumer_conf = getattr(self, 'consumer_conf', {})
+        self._topic_pattern = topic_pattern
+        self._consumer_topic = consumer_topic
+        self._consumer_servers = consumer_servers
         self.consumer_conf = {
             'loop': self._loop,
             'bootstrap_servers': self._consumer_servers,
-            'group_id': get_config('GROUP_ID', self, str(uuid.uuid4())),
-            'client_id': get_config('CLIENT_ID', self, socket.gethostname()),
-            **self.consumer_conf}
+            'group_id': get_config('GROUP_ID', self, group_id),
+            'client_id': client_id or socket.gethostname(),
+            **consumer_conf
+        }
         if self._consumer_topic:
-            self.consumer = _AIOKafkaConsumer(*self._consumer_topic,
-                                            **self.consumer_conf)
+            self.consumer = _AIOKafkaConsumer(*self._consumer_topic, **self.consumer_conf)
         else:
             self.consumer = _AIOKafkaConsumer(**self.consumer_conf)
         self.seeking_end = None
@@ -67,16 +72,16 @@ class AIOKafkaConsumer(AbstractConsumer):
             logger.std_log('Consumer has closed.')
 
 class AIOKafkaProducer(AbstractProducer):
-    def __init__(self, loop=None):
+    def __init__(self, producer_servers: str | list[str], producer_topic: str, producer_conf={}, loop=None):
         self._loop = loop or asyncio.get_event_loop()
-        self.producer_topic = get_config('PRODUCER_TOPIC', self)
-        self._producer_servers = get_config('PRODUCER_SERVERS', self)
-        self._producer_conf = getattr(self, 'producer_conf', {})
+        self.producer_topic = producer_topic
+        self._producer_servers = producer_servers
         self._producer_conf = {
             'loop': self._loop,
             'bootstrap_servers': self._producer_servers,
             'client_id': get_config('CLIENT_ID', self, socket.gethostname()),
-            **self._producer_conf}
+            **producer_conf
+        }
         self.producer = _AIOKafkaProducer(**self._producer_conf)
 
     async def start_producer(self):
@@ -89,7 +94,8 @@ class AIOKafkaProducer(AbstractProducer):
 
     async def _send(self, data, *args, topic=None, headers=None, key=None,
                     **kwargs):
-        if topic is None: raise ValueError('Topic should not be None.')
+        if topic is None: 
+            raise ValueError('Topic should not be None.')
         return await self.producer.send(topic,
                                         *args,
                                         value=data,
