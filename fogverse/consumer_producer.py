@@ -19,9 +19,9 @@ class AIOKafkaConsumer(AbstractConsumer):
     def __init__(self, 
                  consumer_servers: list[str], 
                  group_id: str,
+                 consumer_topic: list[str],
                  client_id: str="",
                  consumer_conf={}, 
-                 consumer_topic: list[str]=[], 
                  topic_pattern=None, 
                  loop=None
                  ):
@@ -72,7 +72,7 @@ class AIOKafkaConsumer(AbstractConsumer):
             logger.std_log('Consumer has closed.')
 
 class AIOKafkaProducer(AbstractProducer):
-    def __init__(self, producer_servers: str | list[str], producer_topic: str, producer_conf={}, loop=None):
+    def __init__(self, producer_servers, producer_topic: str, producer_conf={}, loop=None):
         self._loop = loop or asyncio.get_event_loop()
         self.producer_topic = producer_topic
         self._producer_servers = producer_servers
