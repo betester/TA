@@ -7,7 +7,8 @@ from .consumer_producer import (
 )
 from .base import AbstractConsumer, AbstractProducer
 from .general import Runnable
-from .fogverse_logging import BaseLogging, CsvLogging
+from .profiling import Profiling
+from .manager import Manager
 
 class Producer(AbstractConsumer, AIOKafkaProducer, Runnable):
     pass

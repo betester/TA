@@ -1,5 +1,4 @@
 import asyncio
-import inspect
 import numpy as np
 import cv2
 
@@ -88,7 +87,7 @@ class AbstractProducer:
         async def _call_callback_ack(args:list, kwargs:dict):
             record_metadata = await future if future is not None else None
             res = callback(record_metadata, *args, **kwargs)
-            return (await res) if inspect.iscoroutine(res) else res
+            return (await res) if asyncio.iscoroutine(res) else res
         if hasattr(self, '_get_extra_callback_args'):
             args, kwargs = self._get_extra_callback_args()
         else:

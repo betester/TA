@@ -122,3 +122,13 @@ def numpy_to_base64_url(img, encoding, *args):
     img = _encode(img, encoding, *args)
     b64 = base64.b64encode(img).decode()
     return f'data:image/{encoding};base64,{b64}'
+
+class _Null:
+    pass
+_null = _Null()
+
+def get_config(config_name: str, cls: object=None, default=None):
+    ret = os.getenv(config_name, _null)
+    if not isinstance(ret, _Null): return ret
+    if cls is None: return ret or default
+    return getattr(cls, config_name.lower(), default)

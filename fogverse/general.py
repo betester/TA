@@ -1,4 +1,4 @@
-import inspect
+import asyncio
 import traceback
 
 def _get_func(obj, func_name):
@@ -27,8 +27,10 @@ class Runnable:
         self._started = True
 
     async def _close(self):
+        if getattr(self, '_closed', False) == True: return
         await _call_func_async(self, 'close_producer')
         await _call_func_async(self, 'close_consumer')
+        self._closed = True
 
     async def run(self):
         try:
@@ -56,7 +58,7 @@ class Runnable:
 
                 _call_func(self, '_before_process', args=(data,))
                 result = self.process(data)
-                if inspect.iscoroutine(result):
+                if asyncio.iscoroutine(result):
                     result = await result
                 _call_func(self, '_after_process', args=(result,))
 
