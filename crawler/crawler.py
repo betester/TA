@@ -1,33 +1,26 @@
 import csv
-from random import random
 
-from aiokafka.client import asyncio
-
-from fogverse import Producer
+from typing import Any, Callable, Optional
+from crawler import Crawler, CrawlerResponse
 
 
-class TestCrawler(Producer):
-        
-    def __init__(self):
+class MockUpCrawler(Crawler):
+    
+    def __init__(self, parser: Callable[[Any], CrawlerResponse], *files):
+        self._files = iter(files)
+        self._parser = parser
+        self._set_up_csv_reader()
 
-        self.file = open('./crawler/data/train.csv')
-        self.csv_reader = csv.reader(self.file)
-        self.header = next(self.csv_reader)
-        self.producer_topic = "testing_topic"
-        self.producer_servers = "localhost:9092"
-        Producer.__init__(self)
-
-    async def receive(self):
+    async def crawl(self) -> Optional[CrawlerResponse]:
+        '''
+        This will throw error when there are no more files 
+        left to read, be sure to properly handle the exception
+        '''
         try:
-            random_wait =  random() * 2
-            await asyncio.sleep(random_wait)
-            data = next(self.csv_reader)
-            print(data)
-            return data
-        except StopAsyncIteration:
-            self.csv_reader = csv.reader(self.file)
-            next(self.csv_reader)
-            return next(self.csv_reader)
-
-    async def process(self, data):
-        return data[3]
+            return self._parser(next(self._files))
+        except:
+            self._set_up_csv_reader()
+            
+    def _set_up_csv_reader(self):
+        curr_file = next(self._files)
+        self._current_file_reader = csv.reader(curr_file)

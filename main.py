@@ -1,9 +1,7 @@
 from aiokafka.client import asyncio
+from component import KaggleCrawlerComponent
 from fogverse import Consumer
 from analyzer import TestAnalyzer
-
-from crawler.crawler import TestCrawler
-
 
 class Client(Consumer):
         
@@ -21,12 +19,26 @@ class Client(Consumer):
         return data
 
 
+
 async def main():
-    test_crawler = TestCrawler()
-    test_analyzer = TestAnalyzer()
+    
+    # components 
+    kaggle_crawler_component = KaggleCrawlerComponent(
+        directory_path="./data/crawler/kaggle"
+    )
+    
+    # producers or consumers
     client = Client()
-    return await asyncio.gather(test_crawler.run(), test_analyzer.run(), client.run())
+    analyzer = TestAnalyzer()
+    kaggle_crawler_producer = kaggle_crawler_component.crawler_producer
+
+    return await asyncio.gather(
+        client.run(),
+        analyzer.run(),
+        kaggle_crawler_producer.run()
+    )
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(main())
