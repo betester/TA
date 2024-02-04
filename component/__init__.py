@@ -6,18 +6,7 @@ from crawler.crawler import MockUpCrawler
 from producer.crawler_proucer import CrawlerProducer
 
 
-class KaggleCrawlerComponent:
-
-    def __init__(self, directory_path: str):
-        self._crawler = MockUpCrawler(
-            self.__kaggle_parser, 
-            *self.__read_files(directory_path)
-        )
-        self._crawler_producer = CrawlerProducer(
-            producer_topic="testing_topic",
-            producer_servers="localhost:9092",
-            crawler=self._crawler
-        )
+class CrawlerComponent:
 
     def __kaggle_parser(self, row: list[str]) -> CrawlerResponse:
         return CrawlerResponse(
@@ -29,7 +18,18 @@ class KaggleCrawlerComponent:
         csv_files = [os.path.join(directory_path, file) for file in os.listdir(directory_path) if file.endswith('.csv')]
         return [open(csv_file) for csv_file in csv_files]
     
-    @property
-    def crawler_producer(self):
-        #TODO: make this into a function and do all the instantiation in here
+    def crawler_producer(self, directory_path: str):
+
+        self._crawler = MockUpCrawler(
+            self.__kaggle_parser, 
+            *self.__read_files(directory_path)
+        )
+        self._crawler_producer = CrawlerProducer(
+            producer_topic="testing_topic",
+            producer_servers="localhost:9092",
+            crawler=self._crawler
+        )
         return self._crawler_producer
+
+    def data_lain(self):
+        pass

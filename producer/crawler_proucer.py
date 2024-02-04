@@ -19,7 +19,7 @@ class CrawlerProducer(Producer):
             if data: 
                 return data.message
 
-        except Exception as e:
+        except Exception:
             self.__log.error("No more file to read")
             # stops the crawler
             self._closed = True

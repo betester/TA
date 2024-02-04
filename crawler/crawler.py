@@ -1,5 +1,6 @@
 import csv
 import asyncio
+from random import random
 
 from typing import Any, Callable, Optional
 from crawler import Crawler, CrawlerResponse
@@ -20,7 +21,8 @@ class MockUpCrawler(Crawler):
         try:
             data = self._parser(next(self._current_file_reader))
             # mandatory for  making other to fetch the data
-            await asyncio.sleep(0.01)
+            random_wait = min(0.5, random())
+            await asyncio.sleep(random_wait)
             return data       
         except:
             self._set_up_csv_reader()
@@ -30,3 +32,4 @@ class MockUpCrawler(Crawler):
         curr_file = next(self._files)
         print(curr_file)
         self._current_file_reader = csv.reader(curr_file)
+
