@@ -31,4 +31,5 @@ class KaggleCrawlerComponent:
     
     @property
     def crawler_producer(self):
+        #TODO: make this into a function and do all the instantiation in here
         return self._crawler_producer
