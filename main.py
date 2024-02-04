@@ -8,6 +8,7 @@ class Client(Consumer):
     def __init__(self):
         self.consumer_topic =  "client"
         self.consumer_servers = "localhost:9092"
+        self._closed = False
         Consumer.__init__(self)
     
     async def process(self, data):
@@ -21,6 +22,9 @@ class Client(Consumer):
 
 
 async def main():
+
+    # loop
+    loop = asyncio.get_event_loop()
     
     # components 
     kaggle_crawler_component = KaggleCrawlerComponent(
@@ -28,17 +32,18 @@ async def main():
     )
     
     # producers or consumers
-    client = Client()
-    analyzer = TestAnalyzer()
+    client_task = loop.create_task(Client().run())
+    analyzer_task = loop.create_task(TestAnalyzer().run()) 
     kaggle_crawler_producer = kaggle_crawler_component.crawler_producer
 
+    kaggle_crawler_task = loop.create_task(kaggle_crawler_producer.run())
+
     return await asyncio.gather(
-        client.run(),
-        analyzer.run(),
-        kaggle_crawler_producer.run()
+        client_task,
+        analyzer_task,
+        kaggle_crawler_task,
     )
 
 
 if __name__ == "__main__":
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(main())
+    asyncio.run(main())

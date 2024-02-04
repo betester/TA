@@ -10,7 +10,7 @@ class KaggleCrawlerComponent:
 
     def __init__(self, directory_path: str):
         self._crawler = MockUpCrawler(
-            parser=self.__kaggle_parser, 
+            self.__kaggle_parser, 
             *self.__read_files(directory_path)
         )
         self._crawler_producer = CrawlerProducer(

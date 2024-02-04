@@ -14,6 +14,7 @@ async def _call_func_async(obj, func_name):
     return await coro if coro is not None else None
 
 class Runnable:
+
     def on_error(self, _):
         traceback.print_exc()
 
@@ -37,7 +38,7 @@ class Runnable:
             await _call_func_async(self, '_before_start')
             await self._start()
             await _call_func_async(self, '_after_start')
-            while True:
+            while not self._closed:
                 _call_func(self, '_before_receive')
                 self.message = await self.receive()
                 if self.message is None: continue

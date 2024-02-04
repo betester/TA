@@ -1,4 +1,5 @@
 import csv
+import asyncio
 
 from typing import Any, Callable, Optional
 from crawler import Crawler, CrawlerResponse
@@ -17,10 +18,15 @@ class MockUpCrawler(Crawler):
         left to read, be sure to properly handle the exception
         '''
         try:
-            return self._parser(next(self._files))
+            data = self._parser(next(self._current_file_reader))
+            # mandatory for  making other to fetch the data
+            await asyncio.sleep(0.01)
+            return data       
         except:
             self._set_up_csv_reader()
+            return await self.crawl()
             
     def _set_up_csv_reader(self):
         curr_file = next(self._files)
+        print(curr_file)
         self._current_file_reader = csv.reader(curr_file)
