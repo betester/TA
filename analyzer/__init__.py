@@ -1,18 +1,18 @@
-from fogverse import Consumer, Producer
+
+from abc import ABC, abstractmethod
+from typing import Optional
+from pydantic import BaseModel
 
 
-class TestAnalyzer(Consumer, Producer):
-        
-    def __init__(self):
-        self.consumer_topic =  "testing_topic"
-        self.consumer_servers = "localhost:9092"
-        self.producer_topic = "client"
-        self.producer_servers = "localhost:9092"
-        self._closed = False
-        Producer.__init__(self)
-        Consumer.__init__(self)
+class DisasterAnalyzerResponse(BaseModel):
+    location: str
+    category: str
+    is_disaster: bool
+
     
-    
-    async def process(self, data):
-        print("reversing", data)
-        return data[::-1]
+
+class DisasterAnalyzer(ABC):
+
+    @abstractmethod
+    async def analyze(text: str, self) -> Optional[DisasterAnalyzerResponse]:
+        pass

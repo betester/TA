@@ -3,10 +3,19 @@ import os
 
 from crawler import CrawlerResponse
 from crawler.crawler import MockUpCrawler
+from fogverse.util import get_config
 from producer.crawler_proucer import CrawlerProducer
+from producer.analyzer_producer import AnalyzerProducer
+from analyzer.analyzer import DisasterAnalyzerImpl
 
 
-class CrawlerComponent:
+class Component:
+
+    def __init__(self):
+        self._crawler_topic =  str(get_config("CRAWLER_TOPIC", self, "crawler"))
+        self._analyzer_topic = str(get_config("ANALYZER_TOPIC", self, "analyzer"))
+        self._kafka_server =  str(get_config("KAFKA_SERVER", self, "localhost:9092"))
+
 
     def __kaggle_parser(self, row: list[str]) -> CrawlerResponse:
         return CrawlerResponse(
@@ -25,11 +34,20 @@ class CrawlerComponent:
             *self.__read_files(directory_path)
         )
         self._crawler_producer = CrawlerProducer(
-            producer_topic="testing_topic",
-            producer_servers="localhost:9092",
+            producer_topic=self._crawler_topic,
+            producer_servers=self._kafka_server,
             crawler=self._crawler
         )
         return self._crawler_producer
+    
+    def analyzer_producer(self, model_source: str):
+        analyzer = DisasterAnalyzerImpl(model_source)
+        analyzer_producer = AnalyzerProducer(
+            self._analyzer_topic, 
+            self._kafka_server, 
+            self._crawler_topic, 
+            self._kafka_server, 
+            analyzer
+        )
 
-    def data_lain(self):
-        pass
+        return analyzer_producer
