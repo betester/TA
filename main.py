@@ -1,15 +1,16 @@
 from aiokafka.client import asyncio
 from component import Component
 from producer.analyzer_producer import AnalyzerProducer 
-from fogverse import Consumer
+from fogverse import Consumer, Profiling
 
-class Client(Consumer):
+class Client(Profiling, Consumer):
         
     def __init__(self):
         self.consumer_topic =  "client"
         self.consumer_servers = "localhost:9092"
         self._closed = False
         Consumer.__init__(self)
+        Profiling.__init__(self, name='client-logs', dirname='client-logs')
     
     async def process(self, data):
         print("#" *10 +  "CLIENT" + "#" * 10)

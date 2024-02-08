@@ -1,0 +1,8 @@
+asctime,name,topic from,topic to,frame,offset received,frame delay (ms),msg creation delay (ms),consume time (ms),size data received (KB),decode time (ms),size data decoded (KB),process time (ms),size data processed (KB),encode time (ms),size data encoded (KB),send time (ms),size data sent (KB),offset sent
+2024/02/08 21:59:11.428,csv_crawler-logs,None,crawler,-1,-1,-1,2006.79,2006.79,0.045,0.0,0.045,0.0,0.045,0.0,0.037,5.61,0.037,2014
+2024/02/08 21:59:13.447,csv_crawler-logs,None,crawler,-1,-1,-1,2021.13,2021.13,0.075,0.0,0.075,0.01,0.075,0.0,0.067,2.16,0.067,2015
+2024/02/08 21:59:15.447,csv_crawler-logs,None,crawler,-1,-1,-1,1999.92,1999.92,0.105,0.0,0.105,0.0,0.105,0.0,0.097,2.74,0.097,2016
+2024/02/08 21:59:17.435,csv_crawler-logs,None,crawler,-1,-1,-1,1984.19,1984.19,0.137,0.0,0.137,0.0,0.137,0.0,0.129,6.03,0.129,2017
+2024/02/08 21:59:19.439,csv_crawler-logs,None,crawler,-1,-1,-1,2006.94,2006.94,0.081,0.0,0.081,0.0,0.081,0.0,0.073,3.26,0.073,2018
+2024/02/08 21:59:21.451,csv_crawler-logs,None,crawler,-1,-1,-1,2013.48,2013.48,0.086,0.0,0.086,0.0,0.086,0.0,0.078,2.4,0.078,2019
+2024/02/08 21:59:23.448,csv_crawler-logs,None,crawler,-1,-1,-1,1996.0,1996.0,0.075,0.0,0.075,0.0,0.075,0.0,0.067,2.37,0.067,2020
