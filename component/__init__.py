@@ -13,7 +13,10 @@ class Component:
 
     def __init__(self):
         self._crawler_topic =  str(get_config("CRAWLER_TOPIC", self, "crawler"))
+        self._crawler_consumer_group_id = str(get_config("CRAWLER_CONSUMER_GROUP_ID", self, "crawler"))
         self._analyzer_topic = str(get_config("ANALYZER_TOPIC", self, "analyzer"))
+        self._analyzer_consumer_group_id = str(get_config("ANALYZER_CONSUMER_GROUP_ID", self, "analyzer"))
+
         self._kafka_server =  str(get_config("KAFKA_SERVER", self, "localhost:9092"))
 
 
@@ -35,6 +38,7 @@ class Component:
         )
         self._crawler_producer = CrawlerProducer(
             producer_topic=self._crawler_topic,
+            consumer_group_id=self._crawler_consumer_group_id,
             producer_servers=self._kafka_server,
             crawler=self._crawler
         )
@@ -43,11 +47,12 @@ class Component:
     def analyzer_producer(self, model_source: str):
         analyzer = DisasterAnalyzerImpl(model_source)
         analyzer_producer = AnalyzerProducer(
-            'client_v2', 
-            self._kafka_server, 
-            self._crawler_topic, 
-            self._kafka_server, 
-            analyzer
+            producer_topic='client_v2',
+            producer_servers=self._kafka_server, 
+            consumer_topic=self._crawler_topic, 
+            consumer_servers=self._kafka_server, 
+            analyzer=analyzer,
+            consumer_group_id=self._analyzer_consumer_group_id
         )
 
         return analyzer_producer

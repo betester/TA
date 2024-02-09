@@ -9,13 +9,14 @@ class AnalyzerProducer(Consumer, Producer, Profiling):
                  producer_servers: list[str] | str, 
                  consumer_topic: str, 
                  consumer_servers: str,
+                 consumer_group_id: str,
                  analyzer: DisasterAnalyzer):
 
         self.consumer_topic =  consumer_topic
         self.consumer_servers = consumer_servers
         self.producer_topic = producer_topic 
         self.producer_servers = producer_servers
-        self.consumer_group = "analyzer"
+        self.consumer_group = consumer_group_id
         self._analyzer = analyzer
         self.__log = get_logger(name=self.__class__.__name__)
 

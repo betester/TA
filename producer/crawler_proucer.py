@@ -5,11 +5,15 @@ from fogverse.fogverse_logging import get_logger
 
 class CrawlerProducer(Producer, Profiling):
 
-    def __init__(self, producer_topic: str, producer_servers: list[str] | str, crawler: Crawler):
+    def __init__(self, 
+                 producer_topic: str, 
+                 producer_servers: list[str] | str, 
+                 consumer_group_id: str,
+                 crawler: Crawler):
         self.producer_topic = producer_topic 
         self.producer_servers = producer_servers
         self._crawler = crawler
-        self.consumer_group = "crawler"
+        self.consumer_group = consumer_group_id
         self.__log = get_logger(name=self.__class__.__name__)
         Producer.__init__(self)
         Profiling.__init__(self, name='crawler-logs', dirname='crawler-logs')
