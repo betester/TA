@@ -43,7 +43,7 @@ class Component:
     def analyzer_producer(self, model_source: str):
         analyzer = DisasterAnalyzerImpl(model_source)
         analyzer_producer = AnalyzerProducer(
-            'client', 
+            'client_v2', 
             self._kafka_server, 
             self._crawler_topic, 
             self._kafka_server, 

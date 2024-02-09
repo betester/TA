@@ -9,6 +9,7 @@ class CrawlerProducer(Producer, Profiling):
         self.producer_topic = producer_topic 
         self.producer_servers = producer_servers
         self._crawler = crawler
+        self.consumer_group = "crawler"
         self.__log = get_logger(name=self.__class__.__name__)
         Producer.__init__(self)
         Profiling.__init__(self, name='crawler-logs', dirname='crawler-logs')

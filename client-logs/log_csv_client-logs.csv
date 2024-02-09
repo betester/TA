@@ -1,5 +1,0 @@
-asctime,name,topic from,topic to,frame,offset received,frame delay (ms),msg creation delay (ms),consume time (ms),size data received (KB),decode time (ms),size data decoded (KB),process time (ms),size data processed (KB),encode time (ms),size data encoded (KB),send time (ms),size data sent (KB),offset sent
-2024/02/08 21:59:18.734,csv_client-logs,client,None,None,378,-1,9.48,2.19,1.177,0.0,0.045,2.17,0.045,0.0,0.037,0.0,0.037,None
-2024/02/08 21:59:19.486,csv_client-logs,client,None,None,379,-1,4.92,748.87,1.161,0.0,0.045,1.61,0.045,0.0,0.037,0.0,0.037,None
-2024/02/08 21:59:21.497,csv_client-logs,client,None,None,380,-1,3.95,2008.86,1.145,0.0,0.045,1.61,0.045,0.0,0.037,0.0,0.037,None
-2024/02/08 21:59:23.497,csv_client-logs,client,None,None,381,-1,5.04,1997.4,1.129,0.51,0.045,1.06,0.045,0.0,0.037,0.51,0.037,None
