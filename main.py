@@ -1,13 +1,14 @@
 from aiokafka.client import asyncio
+from analyzer.component import AnalyzerComponent
 from component import Component
 from fogverse import Consumer, Profiling
 
 class Client(Profiling, Consumer):
         
     def __init__(self, number):
-        self.consumer_topic =  "client_v2"
+        self.consumer_topic =  "client"
         self.consumer_servers = "localhost:9092"
-        self.group_id = "client_v2"
+        self.group_id = "client"
         self.number = number
         self._closed = False
         Consumer.__init__(self)
@@ -30,6 +31,7 @@ async def main():
     
     # components 
     component = Component()
+    analyzer_component = AnalyzerComponent()
     
     # producers or consumers
     client_task = loop.create_task(Client(1).run())
@@ -37,7 +39,7 @@ async def main():
     kaggle_crawler_producer = component.crawler_producer(
         directory_path="./data/crawler/kaggle"
     )
-    analyzer_producer = component.analyzer_producer("./mocking_bird.joblib")
+    analyzer_producer = analyzer_component.disaster_analyzer()
 
     analyzer_task = loop.create_task(analyzer_producer.run()) 
     kaggle_crawler_task = loop.create_task(kaggle_crawler_producer.run())

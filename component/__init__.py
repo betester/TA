@@ -12,7 +12,7 @@ from analyzer.analyzer import DisasterAnalyzerImpl
 class Component:
 
     def __init__(self):
-        self._crawler_topic =  str(get_config("CRAWLER_TOPIC", self, "crawler"))
+        self._crawler_topic =  str(get_config("CRAWLER_TOPIC", self, "analyze"))
         self._crawler_consumer_group_id = str(get_config("CRAWLER_CONSUMER_GROUP_ID", self, "crawler"))
         self._analyzer_topic = str(get_config("ANALYZER_TOPIC", self, "analyzer"))
         self._analyzer_consumer_group_id = str(get_config("ANALYZER_CONSUMER_GROUP_ID", self, "analyzer"))
