@@ -2,11 +2,11 @@
 from abc import ABC, abstractmethod
 from typing import Optional
 from pydantic import BaseModel
+from transformers.feature_extraction_utils import torch
 
 
 class DisasterAnalyzerResponse(BaseModel):
-    location: str
-    category: str
+    keyword: Optional[str] = None
     is_disaster: bool
 
     
@@ -14,5 +14,5 @@ class DisasterAnalyzerResponse(BaseModel):
 class DisasterAnalyzer(ABC):
 
     @abstractmethod
-    async def analyze(self, text: str) -> Optional[DisasterAnalyzerResponse]:
+    async def analyze(self, attribute: str, text: str) -> Optional[torch.Tensor]:
         pass
