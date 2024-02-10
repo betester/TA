@@ -5,8 +5,6 @@ from crawler import CrawlerResponse
 from crawler.crawler import MockUpCrawler
 from fogverse.util import get_config
 from producer.crawler_proucer import CrawlerProducer
-from producer.analyzer_producer import AnalyzerProducer
-from analyzer.analyzer import DisasterAnalyzerImpl
 
 
 class Component:
@@ -43,16 +41,3 @@ class Component:
             crawler=self._crawler
         )
         return self._crawler_producer
-    
-    def analyzer_producer(self, model_source: str):
-        analyzer = DisasterAnalyzerImpl(model_source)
-        analyzer_producer = AnalyzerProducer(
-            producer_topic='client_v2',
-            producer_servers=self._kafka_server, 
-            consumer_topic=self._crawler_topic, 
-            consumer_servers=self._kafka_server, 
-            analyzer=analyzer,
-            consumer_group_id=self._analyzer_consumer_group_id
-        )
-
-        return analyzer_producer
