@@ -1,5 +1,6 @@
 
 from analyzer import DisasterAnalyzer
+from crawler.contract import CrawlerResponse
 from fogverse import Producer, Consumer, Profiling
 from fogverse.fogverse_logging import get_logger
 
@@ -20,6 +21,7 @@ class AnalyzerProducer(Consumer, Producer, Profiling):
         self.consumer_group = consumer_group_id
         self._analyzer = analyzer
         self.__log = get_logger(name=self.__class__.__name__)
+        self.auto_decode = False
 
         Producer.__init__(self)
         Consumer.__init__(self)
@@ -27,10 +29,13 @@ class AnalyzerProducer(Consumer, Producer, Profiling):
         self._closed = False
 
 
-    # TODO: change data type to crawler response
-    async def process(self, data: str):
+    def decode(self, data: bytes) -> CrawlerResponse:
+        return CrawlerResponse.model_validate_json(data)
+        
+
+    async def process(self, data: CrawlerResponse):
         try:
-            result = await self._analyzer.analyze(data)
+            result = await self._analyzer.analyze(data.message)
             if result:
                 return str(result.is_disaster)
         except Exception as e:
