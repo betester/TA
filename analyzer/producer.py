@@ -1,5 +1,6 @@
 
 from analyzer import DisasterAnalyzer
+from analyzer.contract import DisasterAnalyzerResponse
 from crawler.contract import CrawlerResponse
 from fogverse import Producer, Consumer, Profiling
 from fogverse.fogverse_logging import get_logger
@@ -32,11 +33,13 @@ class AnalyzerProducer(Consumer, Producer, Profiling):
     def decode(self, data: bytes) -> CrawlerResponse:
         return CrawlerResponse.model_validate_json(data)
         
+    def encode(self,data: DisasterAnalyzerResponse) -> bytes:
+        return data.model_dump_json().encode()
 
     async def process(self, data: CrawlerResponse):
         try:
             result = await self._analyzer.analyze(data.message)
             if result:
-                return str(result.is_disaster)
+                return result
         except Exception as e:
             self.__log.error(e)
