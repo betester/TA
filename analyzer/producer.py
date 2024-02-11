@@ -41,19 +41,20 @@ class AnalyzerProducer(Consumer, Producer, Profiling):
         try:
             message_is_disaster = await self._classifier_model.analyze("is_disaster", data.message)
             
-            if not message_is_disaster or message_is_disaster[0].item() == 0:
+            if message_is_disaster == "0":
                 return DisasterAnalyzerResponse(
-                    is_disaster=False
+                    is_disaster=message_is_disaster,
+                    text=data.message
                 )
 
             keyword_result = await self._classifier_model.analyze("keyword", data.message)
 
             if keyword_result:
                 return DisasterAnalyzerResponse(
-                   keyword=str(keyword_result[0].item()),
-                   is_disaster=True
+                   keyword=keyword_result,
+                   is_disaster=message_is_disaster,
+                   text=data.message
                 )
-
 
         except Exception as e:
             self.__log.error(e)
