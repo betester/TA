@@ -1,26 +1,44 @@
+from confluent_kafka import TopicCollection, admin
+from contract import Master
 
-from kafka import KafkaConsumer, KafkaAdminClient
+class ConsumerAutoScaler(Master):
+    
+    def __init__(self, admin_client: admin.AdminClient):
+        self._admin = admin_client
 
-def get_group_coordinator(bootstrap_servers):
-    admin_client = KafkaAdminClient(bootstrap_servers=bootstrap_servers)
-    group_coordinator = admin_client._find_coordinator_ids(["client"])
-    return group_coordinator[0].nodeId
+    def add_new_consumer(self):
+        return super().add_new_consumer()
+    
+    def _get_topic_total_partitions(self, topic_ids: list[str]) -> dict[str, int]:
+        topic_total_partitions: dict[str, int] = {}
+        
+        topic_description_future = self._admin.describe_topics(TopicCollection(topic_ids))
 
-def list_consumers_for_topic(topic, coordinator_node_id, bootstrap_servers):
-    consumer = KafkaConsumer(bootstrap_servers=bootstrap_servers)
-    group_list = consumer.list_groups()
-    for group in group_list:
-        group_id = group.group_id
-        consumer_group_info = consumer.describe_groups(group_ids=[group_id])
-        members = consumer_group_info[group_id].members
-        for member in members:
-            if topic in member.assignment.topic_names:
-                print(f"Consumer group: {group_id}, Member ID: {member.member_id}, Client ID: {member.client_id}")
+        for topic_id in topic_ids:
+            topic_description: admin.TopicDescription = topic_description_future[topic_id].result()
+            topic_total_partitions[topic_id] = len(topic_description.partitions())
 
-# Kafka brokers
-bootstrap_servers = "localhost:9092"
-topic_name = "your_topic_name"
+        return topic_total_partitions
 
-coordinator_node_id = get_group_coordinator(bootstrap_servers)
-list_consumers_for_topic(topic_name, coordinator_node_id, bootstrap_servers)
+    def _get_consumer_groups_members(self, group_ids: list[str]) -> dict[str, list[admin.MemberDescription]]:
+        groups_description_future = self._admin.describe_consumer_groups(group_ids)
+        consumer_group_members: dict[str, list[admin.MemberDescription]] = {}
+
+        for group_id in group_ids:
+            group_description: admin.ConsumerGroupDescription = groups_description_future[group_id].result()
+            consumer_group_members[group_id] = group_description.members
+
+        return consumer_group_members
+    
+    def _unused_consumer_on_topics(self, topic_id: list[str], group_ids: list[str] = None):
+
+        if group_ids is None:
+            group_ids = self._admin.list_groups()
+
+        consumer_group_members = self._get_consumer_groups_members(group_ids)
+
+        for group_members in consumer_group_members.values():
+            for member in group_members:
+                assignment: admin.MemberAssignment = member.assignment
+                assignment.topic_partitions
 
