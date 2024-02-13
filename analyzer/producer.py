@@ -21,7 +21,7 @@ class AnalyzerProducer(Consumer, Producer, Profiling):
         self.producer_topic = producer_topic 
         self.producer_servers = producer_servers
         self._classifier_model = classifier_model
-        self.consumer_group = consumer_group_id
+        self.group_id = consumer_group_id
         self.__log = get_logger(name=self.__class__.__name__)
         self.auto_decode = False
 

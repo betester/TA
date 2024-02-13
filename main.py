@@ -35,7 +35,6 @@ async def main():
     
     # producers or consumers
     client_task = loop.create_task(Client(1).run())
-    client_task_2 = loop.create_task(Client(2).run())
     kaggle_crawler_producer = crawler_component.mock_disaster_crawler(
         directory_path="./data/crawler/kaggle"
     )
@@ -46,10 +45,8 @@ async def main():
 
     return await asyncio.gather(
         client_task,
-        client_task_2,
         analyzer_task,
         kaggle_crawler_task,
-        
     )
 
 
