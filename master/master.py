@@ -1,93 +1,82 @@
-from time import sleep
-from typing import Optional
 from confluent_kafka import TopicCollection, admin
-from contract import Master
+from fogverse.fogverse_logging import get_logger
+from master.contract import ConsumerMaster, AddConsumerRequest
 
 
-class ConsumerAutoScaler(Master):
+class ConsumerAutoScaler(ConsumerMaster):
     
-    def __init__(self, admin_client: admin.AdminClient):
+    def __init__(self, admin_client: admin.AdminClient, initial_partition: int):
+        #TODO: initialize group id on initialization
+        """
+        Initializes a new instance of the class.
+
+        Args:
+            admin_client (admin.AdminClient): An instance of confluent kafka admin.AdminClient for administrative operations.
+            initial_partition (int): initial partition value for topic that has not been created yet.
+        """
         self._admin = admin_client
+        self._logger = get_logger(name=self.__class__.__name__)
+        self._initial_partition = initial_partition
+        # safe the total consumer based on the group id -> topic_id
+        self._topics_total_consumer : dict[str, dict[str, int]] = {}
+    
 
-    def add_new_consumer(self, topic_id, group_id):
-        topic_id_total_consumer, topic_id_total_partition = self._count_topic_total_partition_and_consumer(
+    def add_consumer(self, request: AddConsumerRequest) -> bool:
+        group_topic_total_consumer = self._topics_total_consumer.get(request.group_id , {})
+        topic_total_consumer = group_topic_total_consumer.get(request.topic_id, 0)
+        
+        topic_does_not_exist = topic_total_consumer == 0
+
+        if topic_does_not_exist:
+            self._create_topic(
+                request.topic_id,
+                number_of_partition=self._initial_partition
+            )
+
+        topic_total_partiton = self._get_topic_total_partitions(request.topic_id)
+
+        partition_is_enough = topic_total_partiton > topic_total_consumer 
+
+        if not partition_is_enough:
+            partition_is_enough = self._add_partition_on(request.topic_id, topic_total_consumer)
+
+        if partition_is_enough:
+            group_topic_total_consumer[request.topic_id] = topic_total_consumer + 1 
+            self._topics_total_consumer[request.group_id] = group_topic_total_consumer
+
+        return partition_is_enough
+
+    
+    def _create_topic(self, topic_id: str, number_of_partition: int):
+        new_topic = admin.NewTopic(
             topic_id,
-            group_id
+            num_partitions=number_of_partition
         )
-        for topic in topic_id:
-            if topic_id_total_consumer[topic] > topic_id_total_partition[topic]:
-                self._add_new_partition_on(
-                    topic,
-                    topic_id_total_consumer[topic]
-                )
-    
-    def _get_topic_total_partitions(self, topic_ids: list[str]) -> dict[str, int]:
-        topic_total_partitions: dict[str, int] = {}
+
+        create_topic_future = self._admin.create_topics([new_topic])[new_topic]
+        # blocks the process until the topic is created
+        create_topic_future.result()
+
+    def _add_partition_on(self, topic_id: str, total_partition: int) -> bool:
+        new_partition = admin.NewPartitions(
+            topic_id, 
+            total_partition
+        )
         
-        topic_description_future = self._admin.describe_topics(TopicCollection(topic_ids))
-
-        for topic_id in topic_ids:
-            topic_description: admin.TopicDescription = topic_description_future[topic_id].result()
-            topic_total_partitions[topic_id] = len(topic_description.partitions())
-
-        return topic_total_partitions
-
-    def _add_new_partition_on(self, topic: str, offset: int):
-        pass
-
-    def _get_consumer_groups_members(self, group_ids: list[str]) -> dict[str, list[admin.MemberDescription]]:
-        groups_description_future = self._admin.describe_consumer_groups(group_ids)
-        consumer_group_members: dict[str, list[admin.MemberDescription]] = {}
-
-        for group_id in group_ids:
-            group_description: admin.ConsumerGroupDescription = groups_description_future[group_id].result()
-            consumer_group_members[group_id] = group_description.members
-
-        return consumer_group_members
-    
-    def _count_topic_total_partition_and_consumer(self, topic_id: list[str], group_ids: Optional[list[str]]):
-
-        if group_ids is None:
-            group_ids =list(map(lambda x : x.id, self._admin.list_groups()))
+        create_partition_future = self._admin.create_partitions(new_partition)[topic_id]
+        # blocks the process until the partition is created
+        create_partition_future.result()
         
-        consumer_group_members = self._get_consumer_groups_members(group_ids)
+        return True
 
-        topic_id_total_consumer: dict[str, int] = {}
-        topic_id_total_partition: dict[str, int] = {}
-
-        for group_members in consumer_group_members.values():
-            for member in group_members:
-                assignment: admin.MemberAssignment = member.assignment
-
-                if not assignment:
-                    continue
-                
-                consumed_topic_by_member = set()
-
-                if len(assignment.topic_partitions) > 0:
-                    for partition in assignment.topic_partitions:
-                        consumed_topic_by_member.add(partition.topic)
-
-                        topic_id_total_partition[partition.topic] = max(
-                            topic_id_total_partition.get(partition.topic, 0),
-                            partition.partition + 1
-                        )
-
-                for topic in consumed_topic_by_member:
-                    if topic in topic_id:
-                        topic_id_total_consumer[topic] += 1
+    def _get_topic_total_partitions(self, topic_id: str) -> int:
         
-        return topic_id_total_consumer, topic_id_total_partition
+        topic_description_future = self._admin.describe_topics(TopicCollection([topic_id]))
 
-consumer_auto_scaler = ConsumerAutoScaler(
-    admin.AdminClient(
-        conf= {
-            "bootstrap.servers": "localhost"
-        }
-    )
-)
+        topic_description: admin.TopicDescription = topic_description_future[topic_id].result()
 
-while True:
-    print(consumer_auto_scaler._count_topic_total_partition_and_consumer(["client"], ["client"]))
-    sleep(1)
+        if not topic_description or not topic_description.partitions:
+            return 0
+        
+        return len(topic_description.partitions)
 

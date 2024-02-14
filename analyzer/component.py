@@ -5,7 +5,7 @@ from .producer import AnalyzerProducer
 class AnalyzerComponent:
 
     def __init__(self):
-        self._producer_topic = str(get_config("ANALYZER_PRODUCER_TOPIC", self, "client"))
+        self._producer_topic = str(get_config("ANALYZER_PRODUCER_TOPIC", self, "client_v4"))
         self._producer_servers = str(get_config("ANALYZER_PRODUCER_SERVERS", self, "localhost:9092"))
         self._consumer_topic = str(get_config("ANALYZER_CONSUMER_TOPIC", self, "analyze"))
         self._consumer_servers = str(get_config("ANALYZER_CONSUMER_SERVERS", self, "localhost:9092"))
