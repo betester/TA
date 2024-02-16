@@ -50,18 +50,15 @@ class AIOKafkaConsumer(AbstractConsumer):
             await self.consumer.seek_to_end()
 
     async def receive(self):
-        try:
-            if getattr(self, 'always_read_last', False):
-                if asyncio.isfuture(self.seeking_end):
-                    await self.seeking_end
-                self.seeking_end = \
-                    asyncio.ensure_future(self.consumer.seek_to_end())
-                if getattr(self, 'always_await_seek_end', False):
-                    await self.seeking_end
-                    self.seeking_end = None
-            return await self.consumer.getone()
-        except:
-            return None
+        if getattr(self, 'always_read_last', False):
+            if asyncio.isfuture(self.seeking_end):
+                await self.seeking_end
+            self.seeking_end = \
+                asyncio.ensure_future(self.consumer.seek_to_end())
+            if getattr(self, 'always_await_seek_end', False):
+                await self.seeking_end
+                self.seeking_end = None
+        return await self.consumer.getone()
 
     async def close_consumer(self):
         await self.consumer.stop()
