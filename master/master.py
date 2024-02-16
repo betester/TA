@@ -32,8 +32,10 @@ class ConsumerAutoScaler(Master):
 
         return topic_total_partitions
 
-    def _add_new_partition_on(self, topic: str, offset: int):
-        pass
+    def _add_new_partition(self, topic: str, amount: int):
+        self._admin.create_partitions(
+            [admin.NewPartitions(topic, amount)]
+        )
 
     def _get_consumer_groups_members(self, group_ids: list[str]) -> dict[str, list[admin.MemberDescription]]:
         groups_description_future = self._admin.describe_consumer_groups(group_ids)
@@ -44,6 +46,16 @@ class ConsumerAutoScaler(Master):
             consumer_group_members[group_id] = len(group_description.members)
 
         return consumer_group_members
+    
+    def _check_balance_of_topic(self, topic_ids: list[str]):
+        # assumption, the name of the group_id is the same as the topic_id
+        total_partition = consumer_auto_scaler._get_topic_total_partitions(topic_ids)
+        total_group_member = consumer_auto_scaler._get_consumer_groups_members(topic_ids)
+
+        for topic_id in topic_ids:
+            if total_group_member[topic_id] > total_partition[topic_id]:
+                print(f'Adding new partition for {topic_id}')
+                self._add_new_partition(topic_id, total_group_member[topic_id])
 
 consumer_auto_scaler = ConsumerAutoScaler(
     admin.AdminClient(
@@ -57,5 +69,6 @@ while True:
     total_partition = consumer_auto_scaler._get_topic_total_partitions(["client"])
     total_group_member = consumer_auto_scaler._get_consumer_groups_members(["client"])
     print(f'Partitions: {total_partition}, Members: {total_group_member}')
+    consumer_auto_scaler._check_balance_of_topic(["client"])
     sleep(1)
 

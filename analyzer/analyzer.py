@@ -12,8 +12,7 @@ import torch.nn.functional as F
 class DisasterAnalyzerImpl(DisasterAnalyzer):
 
     def __init__(self, *model_source: Tuple[str, str]):
-        self._models: dict[str, BertForSequenceClassification] = self._assign_model(*model_source)
-        self._tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+        z
         self.__log = get_logger(name=self.__class__.__name__)
 
 
