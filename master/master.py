@@ -28,7 +28,7 @@ class ConsumerAutoScaler(Master):
 
         for topic_id in topic_ids:
             topic_description: admin.TopicDescription = topic_description_future[topic_id].result()
-            topic_total_partitions[topic_id] = len(topic_description.partitions())
+            topic_total_partitions[topic_id] = len(topic_description.partitions)
 
         return topic_total_partitions
 
@@ -37,47 +37,13 @@ class ConsumerAutoScaler(Master):
 
     def _get_consumer_groups_members(self, group_ids: list[str]) -> dict[str, list[admin.MemberDescription]]:
         groups_description_future = self._admin.describe_consumer_groups(group_ids)
-        consumer_group_members: dict[str, list[admin.MemberDescription]] = {}
+        consumer_group_members: dict[str, int] = {}
 
         for group_id in group_ids:
             group_description: admin.ConsumerGroupDescription = groups_description_future[group_id].result()
-            consumer_group_members[group_id] = group_description.members
+            consumer_group_members[group_id] = len(group_description.members)
 
         return consumer_group_members
-    
-    def _count_topic_total_partition_and_consumer(self, topic_id: list[str], group_ids: Optional[list[str]]):
-
-        if group_ids is None:
-            group_ids =list(map(lambda x : x.id, self._admin.list_groups()))
-        
-        consumer_group_members = self._get_consumer_groups_members(group_ids)
-
-        topic_id_total_consumer: dict[str, int] = {}
-        topic_id_total_partition: dict[str, int] = {}
-
-        for group_members in consumer_group_members.values():
-            for member in group_members:
-                assignment: admin.MemberAssignment = member.assignment
-
-                if not assignment:
-                    continue
-                
-                consumed_topic_by_member = set()
-
-                if len(assignment.topic_partitions) > 0:
-                    for partition in assignment.topic_partitions:
-                        consumed_topic_by_member.add(partition.topic)
-
-                        topic_id_total_partition[partition.topic] = max(
-                            topic_id_total_partition.get(partition.topic, 0),
-                            partition.partition + 1
-                        )
-
-                for topic in consumed_topic_by_member:
-                    if topic in topic_id:
-                        topic_id_total_consumer[topic] += 1
-        
-        return topic_id_total_consumer, topic_id_total_partition
 
 consumer_auto_scaler = ConsumerAutoScaler(
     admin.AdminClient(
@@ -88,6 +54,8 @@ consumer_auto_scaler = ConsumerAutoScaler(
 )
 
 while True:
-    print(consumer_auto_scaler._count_topic_total_partition_and_consumer(["client"], ["client"]))
+    total_partition = consumer_auto_scaler._get_topic_total_partitions(["client"])
+    total_group_member = consumer_auto_scaler._get_consumer_groups_members(["client"])
+    print(f'Partitions: {total_partition}, Members: {total_group_member}')
     sleep(1)
 

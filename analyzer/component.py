@@ -1,6 +1,6 @@
 from fogverse.util import get_config
 from .analyzer import DisasterAnalyzerImpl
-from .producer import AnalyzerProducer
+from .handler import AnalyzerProducer
 
 class AnalyzerComponent:
 
