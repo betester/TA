@@ -5,7 +5,7 @@ from crawler.contract import CrawlerResponse
 from fogverse import Producer, Consumer, Profiling
 from fogverse.fogverse_logging import get_logger
 
-class AnalyzerProducer(Consumer, Producer, Profiling):
+class AnalyzerProducer(Consumer, Producer):
 
     def __init__(self, 
                  producer_topic: str, 
@@ -27,9 +27,9 @@ class AnalyzerProducer(Consumer, Producer, Profiling):
 
         Producer.__init__(self)
         Consumer.__init__(self)
-        Profiling.__init__(self, name='analyzer-logs', dirname='analyzer-logs')
         self._closed = False
-
+    
+    def _before_start
 
     def decode(self, data: bytes) -> CrawlerResponse:
         return CrawlerResponse.model_validate_json(data)

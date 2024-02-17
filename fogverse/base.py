@@ -6,6 +6,10 @@ from .util import bytes_to_numpy, numpy_to_bytes, compress_encoding
 from pickle import UnpicklingError
 
 class AbstractConsumer:
+ 
+    consumer_group = None
+    consumer_topic = None
+
     async def start_consumer(self):
         pass
 
