@@ -54,33 +54,26 @@ class AutoScalingConsumer:
 
     async def _before_start(self, *args, **kwargs):
         
-        partition_is_enough = False
-
-        consumer_group: str = str(getattr(self, 'group_id', None))
-        consumer_topic: str = str(getattr(self, 'consumer_topic', None))
-        consumer = getattr(self, 'consumer') 
-        client_id = getattr(self, 'number')
-
-        consumer_exist = isinstance(consumer, AIOKafkaConsumer)
-
-        if not consumer_exist:
-            raise Exception("Consumer does not exist")
-
-        # initial start
-        await consumer.start()
-
-        loop = asyncio.get_event_loop()
-
         async with AutoScalingConsumer.lock: 
+
+            partition_is_enough = False
+
+            consumer_group: str = str(getattr(self, 'group_id', None))
+            consumer_topic: str = str(getattr(self, 'consumer_topic', None))
+            consumer = getattr(self, 'consumer') 
+            client_id = getattr(self, 'number')
+
+            consumer_exist = isinstance(consumer, AIOKafkaConsumer)
+
+            if not consumer_exist:
+                raise Exception("Consumer does not exist")
+
+            # initial start
+            await consumer.start()
             while not partition_is_enough:
                 try:
-                    group_id_total_task = loop.create_task(self._group_id_total_consumer(consumer_group)) 
-                    topic_id_total_partition_task = loop.create_task(self._topic_id_total_partition(consumer_topic))
-
-                    group_id_total_consumer, topic_id_total_partition = await asyncio.gather(
-                        group_id_total_task,
-                        topic_id_total_partition_task
-                    )
+                    group_id_total_consumer = await self._group_id_total_consumer(consumer_group) 
+                    topic_id_total_partition = await self._topic_id_total_partition(consumer_topic)
 
                     self._logger.info(f"\ngroup_id_total_consumer: {group_id_total_consumer}\ntopic_id_total_partition:{topic_id_total_partition}")
 
