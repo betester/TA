@@ -23,12 +23,12 @@ class AutoScalingConsumer:
 
     async def _group_id_total_consumer(self, group_id: str) -> int:
         group_future_description = self._kafka_admin.describe_consumer_groups([group_id])[group_id]
-        group_description: ConsumerGroupDescription = await asyncio.ensure_future(group_future_description) 
+        group_description: ConsumerGroupDescription = await asyncio.wrap_future(group_future_description) 
         return len(group_description.members)
     
     async def _topic_id_total_partition(self, topic_id: str) -> int:
         topic_future_description = self._kafka_admin.describe_topics([topic_id])[topic_id]
-        topic_description: TopicDescription = await asyncio.ensure_future(topic_future_description) 
+        topic_description: TopicDescription = await asyncio.wrap_future(topic_future_description) 
         return len(topic_description.partitions)
     
 
