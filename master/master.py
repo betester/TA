@@ -6,16 +6,24 @@ from confluent_kafka.admin import (
     TopicDescription,
     NewPartitions
 )
+from aiokafka import AIOKafkaConsumer
+from typing import Optional
 
 from fogverse.fogverse_logging import get_logger
 from fogverse import AbstractConsumer
+from confluent_kafka import KafkaError, KafkaException, TopicCollection
 
 class AutoScalingConsumer:
+
+    lock = asyncio.Lock()
     
     def __init__(self, kafka_admin: AdminClient, sleep_time: int):
         self._kafka_admin = kafka_admin
         self._logger = get_logger(name=self.__class__.__name__)
         self._sleep_time = sleep_time
+
+        # ensuring the runnable won't start the consumer
+        self._started = True
         
         # making sure that the class is consumer class
         self.is_consumer_class()
@@ -27,7 +35,7 @@ class AutoScalingConsumer:
         return len(group_description.members)
     
     async def _topic_id_total_partition(self, topic_id: str) -> int:
-        topic_future_description = self._kafka_admin.describe_topics([topic_id])[topic_id]
+        topic_future_description = self._kafka_admin.describe_topics(TopicCollection([topic_id]))[topic_id]
         topic_description: TopicDescription = await asyncio.wrap_future(topic_future_description) 
         return len(topic_description.partitions)
     
@@ -44,27 +52,56 @@ class AutoScalingConsumer:
         if not issubclass(cls, AbstractConsumer):
             raise Exception("This class should be inherited by consumer")
 
-    async def _before_start(self):
+    async def _before_start(self, *args, **kwargs):
         
         partition_is_enough = False
 
         consumer_group: str = str(getattr(self, 'group_id', None))
         consumer_topic: str = str(getattr(self, 'consumer_topic', None))
+        consumer = getattr(self, 'consumer') 
+        client_id = getattr(self, 'number')
+
+        consumer_exist = isinstance(consumer, AIOKafkaConsumer)
+
+        if not consumer_exist:
+            raise Exception("Consumer does not exist")
+
+        # initial start
+        await consumer.start()
 
         loop = asyncio.get_event_loop()
 
-        while not partition_is_enough:
-            try:
-                group_id_total_task = loop.create_task(self._group_id_total_consumer(consumer_group)) 
-                topic_id_total_partition_task = loop.create_task(self._topic_id_total_partition(consumer_topic))
+        async with AutoScalingConsumer.lock: 
+            while not partition_is_enough:
+                try:
+                    group_id_total_task = loop.create_task(self._group_id_total_consumer(consumer_group)) 
+                    topic_id_total_partition_task = loop.create_task(self._topic_id_total_partition(consumer_topic))
 
-                group_id_total_consumer, topic_id_total_partition = asyncio.gather(group_id_total_task, topic_id_total_partition_task)
+                    group_id_total_consumer, topic_id_total_partition = await asyncio.gather(
+                        group_id_total_task,
+                        topic_id_total_partition_task
+                    )
 
-                partition_is_enough = topic_id_total_partition >= group_id_total_consumer
+                    self._logger.info(f"\ngroup_id_total_consumer: {group_id_total_consumer}\ntopic_id_total_partition:{topic_id_total_partition}")
 
-                if not partition_is_enough:
-                    self._add_partition_on_topic(consumer_topic, group_id_total_consumer)
-            except Exception as e:
-                self._logger.error(e)
+                    partition_is_enough = topic_id_total_partition >= group_id_total_consumer
 
-            await asyncio.sleep(self._sleep_time)
+                    if not partition_is_enough:
+                        self._logger.info(f"Adding {group_id_total_consumer} partition to topic {consumer_topic}")
+                        self._add_partition_on_topic(consumer_topic, group_id_total_consumer)
+
+                except Exception as e:
+                    self._logger.error(e)
+
+                    
+                await asyncio.sleep(self._sleep_time)
+            
+
+            while len(consumer.assignment()) == 0:
+                self._logger.info(f"No partition assigned for client {client_id}, retrying")
+                consumer.unsubscribe()
+                consumer.subscribe([consumer_topic])
+                await asyncio.sleep(self._sleep_time)
+
+            await consumer.seek_to_end()
+
