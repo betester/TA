@@ -60,7 +60,7 @@ class AutoScalingConsumer:
 
                 group_id_total_consumer, topic_id_total_partition = asyncio.gather(group_id_total_task, topic_id_total_partition_task)
 
-                partition_is_enough = topic_id_total_partition > group_id_total_consumer
+                partition_is_enough = topic_id_total_partition >= group_id_total_consumer
 
                 if not partition_is_enough:
                     self._add_partition_on_topic(consumer_topic, group_id_total_consumer)
