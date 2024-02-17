@@ -48,7 +48,7 @@ class AutoScalingConsumer:
         
         partition_is_enough = False
 
-        consumer_group: str = str(getattr(self, 'consumer_group', None))
+        consumer_group: str = str(getattr(self, 'group_id', None))
         consumer_topic: str = str(getattr(self, 'consumer_topic', None))
 
         loop = asyncio.get_event_loop()

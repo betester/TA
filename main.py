@@ -2,8 +2,9 @@ from aiokafka.client import asyncio
 from analyzer.component import AnalyzerComponent
 from crawler.component import CrawlerComponent
 from fogverse import Consumer, Profiling
+from master.master import AutoScalingConsumer
 
-class Client(Profiling, Consumer):
+class Client(Profiling, Consumer, AutoScalingConsumer):
         
     def __init__(self, number):
         self.consumer_topic =  "client"
