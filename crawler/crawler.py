@@ -19,17 +19,22 @@ class MockUpCrawler(Crawler):
         left to read, be sure to properly handle the exception
         '''
         try:
-            data = self._parser(next(self._current_file_reader))
-            # mandatory for  making other to fetch the data
-            random_wait = min(0.5, random())
-            await asyncio.sleep(random_wait)
-            return data       
+            await asyncio.sleep(0.005)
+            return CrawlerResponse(
+                message="This is a disaster message",
+                source="kaggle data"
+            )
+            # data = self._parser(next(self._current_file_reader))
+            # # mandatory for  making other to fetch the data
+            # random_wait = 0.015
+            # await asyncio.sleep(random_wait)
+            # return data       
         except:
             self._set_up_csv_reader()
             return await self.crawl()
             
     def _set_up_csv_reader(self):
         curr_file = next(self._files)
+        self.curr_file = curr_file
         print(curr_file)
         self._current_file_reader = csv.reader(curr_file)
-

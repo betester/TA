@@ -28,8 +28,8 @@ class Client(AutoScalingConsumer, Profiling, Consumer):
         )
     
     async def process(self, data):
-        print("#" *10 +  f"CLIENT {self.number}" + "#" * 10)
-        print(data)
+        # print("#" *10 +  f"CLIENT {self.number}" + "#" * 10)
+        # print(data)
         return data
     
     async def send(self, data, topic=None, key=None, headers=None, callback=None):
