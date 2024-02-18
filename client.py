@@ -1,11 +1,11 @@
 
 from aiokafka.client import asyncio
 from fogverse import Consumer, Profiling
-from master.master import AutoScalingConsumer
+from master.master import ConsumerAutoScaler
 from confluent_kafka.admin import AdminClient
 
 
-class Client(AutoScalingConsumer, Profiling, Consumer):
+class Client(Profiling, Consumer):
         
     def __init__(self, number):
         self.consumer_topic =  "client_v6"
@@ -15,15 +15,6 @@ class Client(AutoScalingConsumer, Profiling, Consumer):
         self._closed = False
         Consumer.__init__(self)
         Profiling.__init__(self, name='client-logs', dirname='client-logs')
-        AutoScalingConsumer.__init__(
-            self, 
-            kafka_admin=AdminClient(
-                conf={
-                    "bootstrap.servers":"localhost"
-                }
-            ),
-            sleep_time=4
-        )
     
     async def process(self, data):
         print("#" *10 +  f"CLIENT {self.number}" + "#" * 10)

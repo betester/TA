@@ -9,10 +9,9 @@ from confluent_kafka.admin import (
 from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
 
 from fogverse.fogverse_logging import get_logger
-from fogverse import AbstractConsumer
 from confluent_kafka import  TopicCollection
 
-class AutoScalingConsumer:
+class ConsumerAutoScaler:
 
     lock = asyncio.Lock()
     
@@ -20,9 +19,6 @@ class AutoScalingConsumer:
         self._kafka_admin = kafka_admin
         self._logger = get_logger(name=self.__class__.__name__)
         self._sleep_time = sleep_time
-
-        # making sure that the class is consumer class
-        self.is_consumer_class()
     
 
     async def _group_id_total_consumer(self, group_id: str) -> int:
@@ -43,21 +39,17 @@ class AutoScalingConsumer:
         future_partition.result()
 
 
-    @classmethod
-    def is_consumer_class(cls):
-        if not issubclass(cls, AbstractConsumer):
-            raise Exception("This class should be inherited by consumer")
-
     async def _start(self, *args, **kwargs):
+
         
-        async with AutoScalingConsumer.lock: 
+        async with ConsumerAutoScaler.lock: 
 
             partition_is_enough = False
 
-            consumer_group: str = str(getattr(self, 'group_id', None))
-            consumer_topic: str = str(getattr(self, 'consumer_topic', None))
-            consumer = getattr(self, 'consumer') 
-            producer = getattr(self, 'producer')
+            consumer_group: str = kwargs.pop("consumer_group", None)
+            consumer_topic: str = kwargs.pop("consumer_topic", None)
+            consumer = kwargs.pop("consumer", None)
+            producer = kwargs.pop("producer", None)
 
             consumer_exist = isinstance(consumer, AIOKafkaConsumer)
             producer_exist = isinstance(producer, AIOKafkaProducer)
@@ -93,10 +85,12 @@ class AutoScalingConsumer:
             
 
             while len(consumer.assignment()) == 0:
-                self._logger.info(f"No partition assigned for retrying")
+                self._logger.info("No partition assigned for retrying")
                 consumer.unsubscribe()
                 consumer.subscribe([consumer_topic])
                 await asyncio.sleep(self._sleep_time)
 
+
+            self._logger.info("Successfully assigned, consuming")
             await consumer.seek_to_end()
 
