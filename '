@@ -31,6 +31,7 @@ class AnalyzerProducer(Consumer, Producer):
         self.__log = get_logger(name=self.__class__.__name__)
         self.auto_decode = False
 
+        self.input_messages = []
         self.input_message_total = 0
 
         self.output_messages = []
@@ -40,7 +41,7 @@ class AnalyzerProducer(Consumer, Producer):
         Consumer.__init__(self)
 
 
-        self._queue: asyncio.Queue = asyncio.Queue(100_000)
+        self._queue = asyncio.Queue(10_000)
         self._consumer_auto_scaler = consumer_auto_scaler
         self._closed = False
 
@@ -64,8 +65,26 @@ class AnalyzerProducer(Consumer, Producer):
     
     async def receive(self):
         result = await super().receive()
+        self.input_messages.append(get_timestamp(utc=False))
         self.input_message_total += 1
         return result
+
+    def _after_receive(self, data):
+
+        if len(self.input_messages) < 2:
+            return 
+
+        new, old = self.input_messages.pop(-1), self.input_messages[0]
+
+        diff = new - old 
+
+
+        if diff.total_seconds() >= 60:
+            self.__log.info(f"Received input message in 1 minute: {self.input_message_total}")
+            self.input_message_total = 0
+            self.input_messages.pop()
+
+        return 
         
     async def send(self, data, topic=None, key=None, headers=None, callback=None):
         result = await super().send(data, topic, key, headers, callback)
@@ -82,11 +101,11 @@ class AnalyzerProducer(Consumer, Producer):
 
         diff = new - old 
 
+        self.__log.info(f"output current seconds: {diff}")
+
         if diff.total_seconds() >= 60:
             self.__log.info(f"Send output message in 1 minute: {self.output_message_total}")
-            self.__log.info(f"Input Output throughput ratio: {self.output_message_total/self.input_message_total}")
             self.output_message_total = 0
-            self.input_message_total = 0
             self.output_messages.pop()
 
 

@@ -33,43 +33,59 @@ class Runnable:
         await _call_func_async(self, 'close_consumer')
         self._closed = True
 
+    async def _consume_worker(self, queue: asyncio.Queue):
+        while True:
+            _call_func(self, '_before_receive')
+            self.message = await self.receive()
+            if self.message is None: 
+                return
+            _call_func(self, '_after_receive', args=(self.message,))
+
+            # kafka and opencv consumer compatibility
+            getvalue = getattr(self.message, 'value', None)
+            if getvalue is None:
+                value = self.message
+            elif callable(getvalue):
+                value = self.message.value()
+            else:
+                value = self.message.value
+
+            _call_func(self, '_before_decode', args=(value,))
+            data = self.decode(value)
+            _call_func(self, '_after_decode', args=(data,))
+
+            await queue.put(data)
+
+    async def _producer_worker(self, queue: asyncio.Queue):
+        while True:
+            data = await queue.get()
+            _call_func(self, '_before_process', args=(data,))
+            result = self.process(data)
+            if asyncio.iscoroutine(result):
+                result = await result
+            _call_func(self, '_after_process', args=(result,))
+
+            _call_func(self, '_before_encode', args=(result,))
+            result_bytes = self.encode(result)
+            _call_func(self, '_after_encode', args=(result_bytes,))
+
+            _call_func(self, '_before_send', args=(result_bytes,))
+            await self.send(result_bytes)
+            _call_func(self, '_after_send', args=(result_bytes,))
+            queue.task_done()
+
+
     async def run(self):
         try:
             await _call_func_async(self, '_before_start')
             await self._start()
             await _call_func_async(self, '_after_start')
-            while not self._closed:
-                _call_func(self, '_before_receive')
-                self.message = await self.receive()
-                if self.message is None: continue
-                _call_func(self, '_after_receive', args=(self.message,))
 
-                # kafka and opencv consumer compatibility
-                getvalue = getattr(self.message, 'value', None)
-                if getvalue is None:
-                    value = self.message
-                elif callable(getvalue):
-                    value = self.message.value()
-                else:
-                    value = self.message.value
+            consume_task = asyncio.create_task(self._consume_worker(self._queue))
+            produce_task = asyncio.create_task(self._producer_worker(self._queue))
 
-                _call_func(self, '_before_decode', args=(value,))
-                data = self.decode(value)
-                _call_func(self, '_after_decode', args=(data,))
-
-                _call_func(self, '_before_process', args=(data,))
-                result = self.process(data)
-                if asyncio.iscoroutine(result):
-                    result = await result
-                _call_func(self, '_after_process', args=(result,))
-
-                _call_func(self, '_before_encode', args=(result,))
-                result_bytes = self.encode(result)
-                _call_func(self, '_after_encode', args=(result_bytes,))
-
-                _call_func(self, '_before_send', args=(result_bytes,))
-                await self.send(result_bytes)
-                _call_func(self, '_after_send', args=(result_bytes,))
+            await asyncio.gather(consume_task, produce_task)
+            
         except Exception as e:
             self.on_error(e)
         finally:

@@ -1,10 +1,12 @@
+import asyncio
 
 from typing import Optional
+
 from .crawler import Crawler, CrawlerResponse
 from fogverse import Producer, Profiling
 from fogverse.fogverse_logging import get_logger
 
-class CrawlerProducer(Producer, Profiling):
+class CrawlerProducer(Producer):
 
     def __init__(self, 
                  producer_topic: str, 
@@ -16,10 +18,11 @@ class CrawlerProducer(Producer, Profiling):
         self.producer_servers = producer_servers
         self._crawler = crawler
         self.group_id = consumer_group_id
+
+        self._queue = asyncio.Queue()
         
         self.__log = get_logger(name=self.__class__.__name__)
         Producer.__init__(self)
-        Profiling.__init__(self, name='crawler-logs', dirname='crawler-logs')
         self.auto_decode = False
         self._closed = False
 
