@@ -6,12 +6,11 @@ from confluent_kafka.admin import (
     TopicDescription,
     NewPartitions
 )
-from aiokafka import AIOKafkaConsumer
-from typing import Optional
+from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
 
 from fogverse.fogverse_logging import get_logger
 from fogverse import AbstractConsumer
-from confluent_kafka import KafkaError, KafkaException, TopicCollection
+from confluent_kafka import  TopicCollection
 
 class AutoScalingConsumer:
 
@@ -22,9 +21,6 @@ class AutoScalingConsumer:
         self._logger = get_logger(name=self.__class__.__name__)
         self._sleep_time = sleep_time
 
-        # ensuring the runnable won't start the consumer
-        self._started = True
-        
         # making sure that the class is consumer class
         self.is_consumer_class()
     
@@ -52,7 +48,7 @@ class AutoScalingConsumer:
         if not issubclass(cls, AbstractConsumer):
             raise Exception("This class should be inherited by consumer")
 
-    async def _before_start(self, *args, **kwargs):
+    async def _start(self, *args, **kwargs):
         
         async with AutoScalingConsumer.lock: 
 
@@ -61,14 +57,21 @@ class AutoScalingConsumer:
             consumer_group: str = str(getattr(self, 'group_id', None))
             consumer_topic: str = str(getattr(self, 'consumer_topic', None))
             consumer = getattr(self, 'consumer') 
+            producer = getattr(self, 'producer')
             client_id = getattr(self, 'number')
 
             consumer_exist = isinstance(consumer, AIOKafkaConsumer)
+            producer_exist = isinstance(producer, AIOKafkaProducer)
 
             if not consumer_exist:
                 raise Exception("Consumer does not exist")
 
+            if producer_exist:
+                self._logger.info("Starting producer")
+                await producer.start()
+
             # initial start
+            self._logger.info("Starting consumer")
             await consumer.start()
             while not partition_is_enough:
                 try:
