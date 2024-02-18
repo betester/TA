@@ -1,7 +1,5 @@
 
 from aiokafka.client import asyncio
-from analyzer.component import AnalyzerComponent
-from crawler.component import CrawlerComponent
 from fogverse import Consumer, Profiling
 from master.master import AutoScalingConsumer
 from confluent_kafka.admin import AdminClient
@@ -24,7 +22,7 @@ class Client(AutoScalingConsumer, Profiling, Consumer):
                     "bootstrap.servers":"localhost"
                 }
             ),
-            sleep_time=10
+            sleep_time=4
         )
     
     async def process(self, data):
