@@ -58,7 +58,6 @@ class AutoScalingConsumer:
             consumer_topic: str = str(getattr(self, 'consumer_topic', None))
             consumer = getattr(self, 'consumer') 
             producer = getattr(self, 'producer')
-            client_id = getattr(self, 'number')
 
             consumer_exist = isinstance(consumer, AIOKafkaConsumer)
             producer_exist = isinstance(producer, AIOKafkaProducer)
@@ -94,7 +93,7 @@ class AutoScalingConsumer:
             
 
             while len(consumer.assignment()) == 0:
-                self._logger.info(f"No partition assigned for client {client_id}, retrying")
+                self._logger.info(f"No partition assigned for retrying")
                 consumer.unsubscribe()
                 consumer.subscribe([consumer_topic])
                 await asyncio.sleep(self._sleep_time)
