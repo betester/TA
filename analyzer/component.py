@@ -1,6 +1,6 @@
 from typing import Optional
 from fogverse.util import get_config
-from master.master import ConsumerAutoScaler
+from master.master import ConsumerAutoScaler, ProducerObserver
 from .analyzer import DisasterAnalyzerImpl
 from .producer import AnalyzerProducer
 
@@ -16,7 +16,7 @@ class AnalyzerComponent:
         self._disaster_classifier_model_source = ("is_disaster", str(get_config("DISASTER_CLASSIFIER_MODEL_SOURCE", self, "./mocking_bird")))
         self._keyword_classifier_model_source = ("keyword", str(get_config("KEYWORD_CLASSIFIER_MODEL_SOURCE", self, "./jay_bird")))
 
-    def disaster_analyzer(self, consumer_auto_scaler: Optional[ConsumerAutoScaler]):
+    def disaster_analyzer(self, consumer_auto_scaler: Optional[ConsumerAutoScaler], producer_observer: ProducerObserver):
         
         disaster_analyzers = DisasterAnalyzerImpl(
             self._disaster_classifier_model_source,
@@ -30,7 +30,8 @@ class AnalyzerComponent:
             consumer_servers=self._consumer_servers, 
             classifier_model=disaster_analyzers,
             consumer_group_id=self._consumer_group_id,
-            consumer_auto_scaler=consumer_auto_scaler
+            consumer_auto_scaler=consumer_auto_scaler,
+            producer_observer=producer_observer
         )
 
         return analyzer_producer

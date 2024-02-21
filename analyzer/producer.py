@@ -1,6 +1,6 @@
 
 from analyzer import DisasterAnalyzer
-from master.master import ConsumerAutoScaler
+from master.master import ConsumerAutoScaler, ProducerObserver
 from .contract import DisasterAnalyzerResponse
 from crawler.contract import CrawlerResponse
 from fogverse import Producer, Consumer
@@ -17,11 +17,15 @@ class AnalyzerProducer(Consumer, Producer):
                  consumer_servers: str,
                  consumer_group_id: str,
                  classifier_model: DisasterAnalyzer,
-                 consumer_auto_scaler: Optional[ConsumerAutoScaler]
+                 consumer_auto_scaler: Optional[ConsumerAutoScaler],
+                 producer_observer: ProducerObserver
                 ):
 
         self.consumer_topic =  consumer_topic
         self.consumer_servers = consumer_servers
+        self.consumer_conf = {
+            "heartbeat_interval_ms": 6750
+        }
         self.producer_topic = producer_topic 
         self.producer_servers = producer_servers
         self._classifier_model = classifier_model
@@ -33,6 +37,7 @@ class AnalyzerProducer(Consumer, Producer):
         Consumer.__init__(self)
 
         self._consumer_auto_scaler = consumer_auto_scaler
+        self._observer = producer_observer
         self._closed = False
 
 
@@ -52,6 +57,13 @@ class AnalyzerProducer(Consumer, Producer):
             )
         else:
             await super()._start()
+
+        await self._observer.send_input_output_ratio_pair(
+            source_topic=self.consumer_topic,
+            target_topic=self.producer_topic,
+            producer=self.producer
+        )
+
 
     async def process(self, data: CrawlerResponse):
         try:
@@ -74,3 +86,8 @@ class AnalyzerProducer(Consumer, Producer):
 
         except Exception as e:
             self.__log.error(e)
+
+    async def send(self, data, topic=None, key=None, headers=None, callback=None):
+        result = await super().send(data, topic, key, headers, callback)
+        await self._observer.send_success_send_timestamp(target_topic=self.producer_topic, producer=self.producer)
+        return result

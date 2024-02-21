@@ -1,6 +1,8 @@
 
 import os
 
+from master.master import ProducerObserver
+
 from .crawler import MockUpCrawler
 from .contract import CrawlerResponse
 from .producer import CrawlerProducer
@@ -24,16 +26,18 @@ class CrawlerComponent:
         csv_files = [os.path.join(directory_path, file) for file in os.listdir(directory_path) if file.endswith('.csv')]
         return [open(csv_file) for csv_file in csv_files]
 
-    def mock_disaster_crawler(self, directory_path: str):
+    def mock_disaster_crawler(self, directory_path: str, observer: ProducerObserver):
 
-        self._crawler = MockUpCrawler(
+        crawler = MockUpCrawler(
             self.__kaggle_parser, 
             *self.__read_files(directory_path)
         )
-        self._crawler_producer = CrawlerProducer(
+        
+
+        return CrawlerProducer(
             producer_topic=self._producer_topic,
             consumer_group_id=self._consumer_group_id,
             producer_servers=self._producer_servers,
-            crawler=self._crawler
+            crawler=crawler,
+            observer=observer
         )
-        return self._crawler_producer
