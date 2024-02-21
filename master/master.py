@@ -1,74 +1,96 @@
-from time import sleep
-from typing import Optional
-from confluent_kafka import TopicCollection, admin
-from contract import Master
 
-
-class ConsumerAutoScaler(Master):
-    
-    def __init__(self, admin_client: admin.AdminClient):
-        self._admin = admin_client
-
-    def add_new_consumer(self, topic_id, group_id):
-        topic_id_total_consumer, topic_id_total_partition = self._count_topic_total_partition_and_consumer(
-            topic_id,
-            group_id
-        )
-        for topic in topic_id:
-            if topic_id_total_consumer[topic] > topic_id_total_partition[topic]:
-                self._add_new_partition_on(
-                    topic,
-                    topic_id_total_consumer[topic]
-                )
-    
-    def _get_topic_total_partitions(self, topic_ids: list[str]) -> dict[str, int]:
-        topic_total_partitions: dict[str, int] = {}
-        
-        topic_description_future = self._admin.describe_topics(TopicCollection(topic_ids))
-
-        for topic_id in topic_ids:
-            topic_description: admin.TopicDescription = topic_description_future[topic_id].result()
-            topic_total_partitions[topic_id] = len(topic_description.partitions)
-
-        return topic_total_partitions
-
-    def _add_new_partition(self, topic: str, amount: int):
-        self._admin.create_partitions(
-            [admin.NewPartitions(topic, amount)]
-        )
-
-    def _get_consumer_groups_members(self, group_ids: list[str]) -> dict[str, list[admin.MemberDescription]]:
-        groups_description_future = self._admin.describe_consumer_groups(group_ids)
-        consumer_group_members: dict[str, int] = {}
-
-        for group_id in group_ids:
-            group_description: admin.ConsumerGroupDescription = groups_description_future[group_id].result()
-            consumer_group_members[group_id] = len(group_description.members)
-
-        return consumer_group_members
-    
-    def _check_balance_of_topic(self, topic_ids: list[str]):
-        # assumption, the name of the group_id is the same as the topic_id
-        total_partition = consumer_auto_scaler._get_topic_total_partitions(topic_ids)
-        total_group_member = consumer_auto_scaler._get_consumer_groups_members(topic_ids)
-
-        for topic_id in topic_ids:
-            if total_group_member[topic_id] > total_partition[topic_id]:
-                print(f'Adding new partition for {topic_id}')
-                self._add_new_partition(topic_id, total_group_member[topic_id])
-
-consumer_auto_scaler = ConsumerAutoScaler(
-    admin.AdminClient(
-        conf= {
-            "bootstrap.servers": "localhost"
-        }
-    )
+from aiokafka.client import asyncio
+from confluent_kafka.admin import (
+    AdminClient,
+    ConsumerGroupDescription,
+    TopicDescription,
+    NewPartitions
 )
+from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
 
-while True:
-    total_partition = consumer_auto_scaler._get_topic_total_partitions(["client"])
-    total_group_member = consumer_auto_scaler._get_consumer_groups_members(["client"])
-    print(f'Partitions: {total_partition}, Members: {total_group_member}')
-    consumer_auto_scaler._check_balance_of_topic(["client"])
-    sleep(1)
+from fogverse.fogverse_logging import get_logger
+from confluent_kafka import  TopicCollection
+
+class ConsumerAutoScaler:
+
+    lock = asyncio.Lock()
+    
+    def __init__(self, kafka_admin: AdminClient, sleep_time: int):
+        self._kafka_admin = kafka_admin
+        self._logger = get_logger(name=self.__class__.__name__)
+        self._sleep_time = sleep_time
+    
+
+    async def _group_id_total_consumer(self, group_id: str) -> int:
+        group_future_description = self._kafka_admin.describe_consumer_groups([group_id])[group_id]
+        group_description: ConsumerGroupDescription = await asyncio.wrap_future(group_future_description) 
+        return len(group_description.members)
+    
+    async def _topic_id_total_partition(self, topic_id: str) -> int:
+        topic_future_description = self._kafka_admin.describe_topics(TopicCollection([topic_id]))[topic_id]
+        topic_description: TopicDescription = await asyncio.wrap_future(topic_future_description) 
+        return len(topic_description.partitions)
+    
+
+    def _add_partition_on_topic(self, topic_id: str, new_total_partition: int):
+        future_partition = self._kafka_admin.create_partitions([NewPartitions(topic_id, new_total_partition)])[topic_id]
+
+        # waits until the partition is created
+        future_partition.result()
+
+
+    async def _start(self, *args, **kwargs):
+
+        
+        async with ConsumerAutoScaler.lock: 
+
+            partition_is_enough = False
+
+            consumer_group: str = kwargs.pop("consumer_group", None)
+            consumer_topic: str = kwargs.pop("consumer_topic", None)
+            consumer = kwargs.pop("consumer", None)
+            producer = kwargs.pop("producer", None)
+
+            consumer_exist = isinstance(consumer, AIOKafkaConsumer)
+            producer_exist = isinstance(producer, AIOKafkaProducer)
+
+            if not consumer_exist:
+                raise Exception("Consumer does not exist")
+
+            if producer_exist:
+                self._logger.info("Starting producer")
+                await producer.start()
+
+            # initial start
+            self._logger.info("Starting consumer")
+            await consumer.start()
+            while not partition_is_enough:
+                try:
+                    group_id_total_consumer = await self._group_id_total_consumer(consumer_group) 
+                    topic_id_total_partition = await self._topic_id_total_partition(consumer_topic)
+
+                    self._logger.info(f"\ngroup_id_total_consumer: {group_id_total_consumer}\ntopic_id_total_partition:{topic_id_total_partition}")
+
+                    partition_is_enough = topic_id_total_partition >= group_id_total_consumer
+
+                    if not partition_is_enough:
+                        self._logger.info(f"Adding {group_id_total_consumer} partition to topic {consumer_topic}")
+                        self._add_partition_on_topic(consumer_topic, group_id_total_consumer)
+
+                except Exception as e:
+                    self._logger.error(e)
+
+                    
+                await asyncio.sleep(self._sleep_time)
+            
+
+            while len(consumer.assignment()) == 0:
+                self._logger.info("No partition assigned for retrying")
+                consumer.unsubscribe()
+                consumer.subscribe([consumer_topic])
+                await asyncio.sleep(self._sleep_time)
+
+
+            self._logger.info("Successfully assigned, consuming")
+            await consumer.seek_to_end()
 

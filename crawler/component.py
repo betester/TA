@@ -11,7 +11,7 @@ class CrawlerComponent:
 
     def __init__(self):
         self._producer_servers =  str(get_config("CRAWLER_ANALYZER_SERVERS", self, "localhost:9092"))
-        self._producer_topic =  str(get_config("CRAWLER_PRODUCER_TOPIC", self, "analyze"))
+        self._producer_topic =  str(get_config("CRAWLER_PRODUCER_TOPIC", self, "analyze_v1"))
         self._consumer_group_id = str(get_config("CRAWLER_CONSUMER_GROUP_ID", self, "crawler"))
 
     def __kaggle_parser(self, row: list[str]) -> CrawlerResponse:
