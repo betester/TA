@@ -1,11 +1,14 @@
 
 from analyzer import DisasterAnalyzer
+from master.master import ConsumerAutoScaler
 from .contract import DisasterAnalyzerResponse
 from crawler.contract import CrawlerResponse
-from fogverse import Producer, Consumer, Profiling
+from fogverse import Producer, Consumer
 from fogverse.fogverse_logging import get_logger
+from typing import Optional
 
-class AnalyzerProducer(Consumer, Producer, Profiling):
+
+class AnalyzerProducer(Consumer, Producer):
 
     def __init__(self, 
                  producer_topic: str, 
@@ -14,6 +17,7 @@ class AnalyzerProducer(Consumer, Producer, Profiling):
                  consumer_servers: str,
                  consumer_group_id: str,
                  classifier_model: DisasterAnalyzer,
+                 consumer_auto_scaler: Optional[ConsumerAutoScaler]
                 ):
 
         self.consumer_topic =  consumer_topic
@@ -27,7 +31,8 @@ class AnalyzerProducer(Consumer, Producer, Profiling):
 
         Producer.__init__(self)
         Consumer.__init__(self)
-        Profiling.__init__(self, name='analyzer-logs', dirname='analyzer-logs')
+
+        self._consumer_auto_scaler = consumer_auto_scaler
         self._closed = False
 
 
@@ -36,6 +41,17 @@ class AnalyzerProducer(Consumer, Producer, Profiling):
         
     def encode(self,data: DisasterAnalyzerResponse) -> bytes:
         return data.model_dump_json().encode()
+
+    async def _start(self):
+        if self._consumer_auto_scaler:
+            await self._consumer_auto_scaler._start(
+                consumer=self.consumer,
+                consumer_group=self.group_id,
+                consumer_topic=self.consumer_topic,
+                producer=self.producer,
+            )
+        else:
+            await super()._start()
 
     async def process(self, data: CrawlerResponse):
         try:
