@@ -38,23 +38,27 @@ class AnalyzerProducer(Consumer, Producer, Profiling):
         return data.model_dump_json().encode()
 
     async def process(self, data: CrawlerResponse):
-        try:
-            message_is_disaster = await self._classifier_model.analyze("is_disaster", data.message)
+        return DisasterAnalyzerResponse(
+            is_disaster="0",
+            text=data.message
+        )
+        # try:
+        #     message_is_disaster = await self._classifier_model.analyze("is_disaster", data.message)
             
-            if message_is_disaster == "0":
-                return DisasterAnalyzerResponse(
-                    is_disaster=message_is_disaster,
-                    text=data.message
-                )
+        #     if message_is_disaster == "0":
+        #         return DisasterAnalyzerResponse(
+        #             is_disaster=message_is_disaster,
+        #             text=data.message
+        #         )
 
-            keyword_result = await self._classifier_model.analyze("keyword", data.message)
+        #     keyword_result = await self._classifier_model.analyze("keyword", data.message)
 
-            if keyword_result:
-                return DisasterAnalyzerResponse(
-                   keyword=keyword_result,
-                   is_disaster=message_is_disaster,
-                   text=data.message
-                )
+        #     if keyword_result:
+        #         return DisasterAnalyzerResponse(
+        #            keyword=keyword_result,
+        #            is_disaster=message_is_disaster,
+        #            text=data.message
+        #         )
 
-        except Exception as e:
-            self.__log.error(e)
+        # except Exception as e:
+        #     self.__log.error(e)

@@ -19,15 +19,17 @@ class Observer(Consumer, Profiling):
     def _after_receive(self, data):
         result = super()._after_receive(data)
 
-        old, new = self.input_timestamps[0], self.input_timestamps[-1]
+        if len(self.input_timestamps) < 2:
+            return 
+
+        old, new = self.input_timestamps[0], self.input_timestamps.pop(-1)
 
         diff = new - old
 
         if diff.total_seconds() >= 60:
-            self.__log.info(f"Total messages input in 60 secs: {len(self.input_timestamps)}")
             self.__log.info(f"Total raw messages: {self.counter['raw']}, Ratio: {self.counter['raw']/60}")
             self.__log.info(f"Total processed messages: {self.counter['processed']}, Ratio: {self.counter['processed']/60}")
-            self.input_timestamps = []
+            self.input_timestamps.pop()
             self.counter = {'raw': 0, 'processed': 0}
 
         return result

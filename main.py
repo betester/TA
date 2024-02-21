@@ -17,11 +17,11 @@ async def main():
     )
     analyzer_producer = analyzer_component.disaster_analyzer()
 
-    analyzer_task = loop.create_task(analyzer_producer.run()) 
+    # analyzer_task = loop.create_task(analyzer_producer.run()) 
     kaggle_crawler_task = loop.create_task(kaggle_crawler_producer.run())
 
     return await asyncio.gather(
-        analyzer_task,
+        # analyzer_task,
         kaggle_crawler_task,
     )
 
