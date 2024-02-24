@@ -12,9 +12,11 @@ import torch.nn.functional as F
 class DisasterAnalyzerImpl(DisasterAnalyzer):
 
     def __init__(self, *model_source: Tuple[str, str]):
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self._models: dict[str, BertForSequenceClassification] = self._assign_model(*model_source)
         self._tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
         self.__log = get_logger(name=self.__class__.__name__)
+
 
 
     def analyze(self, attribute: str, text: str) -> Optional[str]:
@@ -29,6 +31,7 @@ class DisasterAnalyzerImpl(DisasterAnalyzer):
                 return_attention_mask=True, 
                 return_tensors='pt'
             )
+            tokenized_text.to(self.device)
             model = self._models[attribute]
             id2label = model.config.id2label 
             
@@ -47,9 +50,9 @@ class DisasterAnalyzerImpl(DisasterAnalyzer):
     def _assign_model(self, *model_sources: Tuple[str, str]) -> dict[str, BertForSequenceClassification]:
         
         models: dict[str, BertForSequenceClassification] = {}
-
         for attribute, model_source in model_sources:
             model = BertForSequenceClassification.from_pretrained(model_source)
             if type(model) == BertForSequenceClassification:
+                model.to(self.device)
                 models[attribute] = model
         return models
