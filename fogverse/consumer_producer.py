@@ -1,9 +1,6 @@
 import asyncio
-from contextvars import  ContextVar, copy_context
-from logging import error
-import os
+from collections.abc import Callable
 from threading import Event
-import time
 import socket
 import sys
 from typing import Any
@@ -135,7 +132,6 @@ class ConfluentConsumer:
             while not stop_event.is_set():
                 message: Message = self.consumer.poll(self.poll_time)
                 queue.put(message)
-                print("Berhenti gak?")
         except Exception as e:
             self.log.error(e)
 
@@ -159,20 +155,26 @@ class ConfluentProducer:
 
         self.log = get_logger()
     
-    def start_produce(self, queue: queue.Queue, stop_event: Event, producer_id: int):
+    def start_produce(self, queue: queue.Queue, stop_event: Event, on_complete: Callable[[str, Producer], None]):
         try:
             while not stop_event.is_set():
                 message: Message= queue.get()
-                self.log.info(f"Producer {producer_id} is consuming the message")
-                value = self.processor.process(message)
-                self.producer.produce(
-                    topic=self.topic,
-                    value=value
-                )
-                queue.task_done()
+                
+                if message is None:
+                    continue
+
+                elif message.error():
+                    self.log.error(message.error())
+
+                else:
+                    result: bytes = self.processor.process(message)
+                    self.producer.produce(topic=self.topic, value=result)
+                    queue.task_done()
+                    on_complete(self.topic, self.producer)
 
         except Exception as e: 
             self.log.error(e)
+
 
 def _get_cv_video_capture(device=0):
     import cv2

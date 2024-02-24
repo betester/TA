@@ -17,7 +17,7 @@ class DisasterAnalyzerImpl(DisasterAnalyzer):
         self.__log = get_logger(name=self.__class__.__name__)
 
 
-    async def analyze(self, attribute: str, text: str) -> Optional[str]:
+    def analyze(self, attribute: str, text: str) -> Optional[str]:
         try:
             tokenized_text = self._tokenizer.encode_plus(
                 text,

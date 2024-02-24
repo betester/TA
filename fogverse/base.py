@@ -1,5 +1,6 @@
 
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from confluent_kafka import Message
 import asyncio
 import numpy as np

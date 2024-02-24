@@ -9,7 +9,7 @@ from confluent_kafka.admin import (
 from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
 
 from fogverse.fogverse_logging import get_logger
-from confluent_kafka import TopicCollection
+from confluent_kafka import Producer, TopicCollection
 from fogverse.util import get_timestamp
 from master.contract import InputOutputThroughputPair, MachineConditionData
 
@@ -102,24 +102,27 @@ class ProducerObserver:
         self._producer_topic = producer_topic 
 
 
-    async def send_input_output_ratio_pair(self, source_topic: str, target_topic: str, producer: AIOKafkaProducer):
+    def send_input_output_ratio_pair(self, source_topic: str, target_topic: str, producer: Producer):
         '''
         Identify which topic pair should the observer ratio with
         '''
         if source_topic is not None:
-            await producer.send(
+            producer.send(
                 topic=self._producer_topic,
                 value=self._input_output_pair_data_format(source_topic, target_topic)
             )
     
-    async def send_success_send_timestamp(self, target_topic: str, producer: AIOKafkaProducer):
+    def send_success_send_timestamp(self, target_topic: str, producer: Producer):
         if target_topic is not None:
 
             data = self._success_timestamp_data_format(target_topic)
-            await producer.send(
-                topic=self._producer_topic,
-                value=data
-            )
+            try:
+                producer.produce(
+                    topic=self._producer_topic,
+                    value=data
+                )
+            except Exception as e:
+                pass
 
     def _input_output_pair_data_format(self, source_topic, target_topic: str):
         return InputOutputThroughputPair(

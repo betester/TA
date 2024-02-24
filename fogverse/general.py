@@ -1,4 +1,5 @@
 import asyncio
+from collections.abc import Callable
 from contextvars import ContextVar
 from threading import Event
 import time
@@ -6,6 +7,8 @@ from concurrent.futures import ThreadPoolExecutor, wait
 import queue
 import traceback
 from typing import Optional
+
+from confluent_kafka import Producer
 
 from .consumer_producer import ConfluentConsumer, ConfluentProducer
 
@@ -104,7 +107,7 @@ class ParallelRunnable:
         self.consumer_tasks = []
         self.producer_tasks = []
 
-    def run(self):
+    def run(self, on_producer_complete: Callable[[str, Producer], None]):
         consumer_thread_pool = ThreadPoolExecutor(self.total_consumer)
         producer_thread_pool = ThreadPoolExecutor(self.total_producer)
 
@@ -118,11 +121,13 @@ class ParallelRunnable:
                     stop_event)
                 for i in range(self.total_consumer)
             ]
+
             self.producer_tasks = [
                 producer_thread_pool.submit(
                     self.producer.start_produce,
                     self.queue,
-                    stop_event, i
+                    stop_event,
+                    on_producer_complete
                 ) for i in range(self.total_producer)
             ]
 

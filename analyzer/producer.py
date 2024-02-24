@@ -1,11 +1,14 @@
 
+from collections.abc import Callable
 from analyzer import DisasterAnalyzer
+from fogverse.general import ParallelRunnable
 from master.master import ConsumerAutoScaler, ProducerObserver
 from .contract import DisasterAnalyzerResponse
 from crawler.contract import CrawlerResponse
 from fogverse import Producer, Consumer
 from fogverse.fogverse_logging import get_logger
 from typing import Optional
+from confluent_kafka import Producer as ConfluentProducer
 
 
 class AnalyzerProducer(Consumer, Producer):
@@ -23,9 +26,6 @@ class AnalyzerProducer(Consumer, Producer):
 
         self.consumer_topic =  consumer_topic
         self.consumer_servers = consumer_servers
-        self.consumer_conf = {
-            "heartbeat_interval_ms": 6750
-        }
         self.producer_topic = producer_topic 
         self.producer_servers = producer_servers
         self._classifier_model = classifier_model
@@ -58,7 +58,7 @@ class AnalyzerProducer(Consumer, Producer):
         else:
             await super()._start()
 
-        await self._observer.send_input_output_ratio_pair(
+        self._observer.send_input_output_ratio_pair(
             source_topic=self.consumer_topic,
             target_topic=self.producer_topic,
             producer=self.producer
@@ -67,7 +67,7 @@ class AnalyzerProducer(Consumer, Producer):
 
     async def process(self, data: CrawlerResponse):
         try:
-            message_is_disaster = await self._classifier_model.analyze("is_disaster", data.message)
+            message_is_disaster = self._classifier_model.analyze("is_disaster", data.message)
             
             if message_is_disaster == "0":
                 return DisasterAnalyzerResponse(
@@ -75,7 +75,7 @@ class AnalyzerProducer(Consumer, Producer):
                     text=data.message
                 )
 
-            keyword_result = await self._classifier_model.analyze("keyword", data.message)
+            keyword_result = self._classifier_model.analyze("keyword", data.message)
 
             if keyword_result:
                 return DisasterAnalyzerResponse(
@@ -89,5 +89,14 @@ class AnalyzerProducer(Consumer, Producer):
 
     async def send(self, data, topic=None, key=None, headers=None, callback=None):
         result = await super().send(data, topic, key, headers, callback)
-        await self._observer.send_success_send_timestamp(target_topic=self.producer_topic, producer=self.producer)
+        self._observer.send_success_send_timestamp(target_topic=self.producer_topic, producer=self.producer)
         return result
+
+class ParallelAnalyzerJobService:
+    #TODO: add observer
+    def __init__(self, runnable: ParallelRunnable):
+        self.runnable = runnable
+
+    def start(self, on_producer_complete: Callable[[str, ConfluentProducer], None]):
+        self.runnable.run(on_producer_complete)
+

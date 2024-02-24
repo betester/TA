@@ -24,7 +24,6 @@ def main():
         topic="client",
         kafka_server="localhost:9092",
         processor=TestProcessor()
-    )
 
     runnable = ParallelRunnable(
         consumer,
