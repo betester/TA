@@ -1,5 +1,13 @@
 import asyncio
+from contextvars import ContextVar
+from threading import Event
+import time
+from concurrent.futures import ThreadPoolExecutor, wait
+import queue
 import traceback
+from typing import Optional
+
+from .consumer_producer import ConfluentConsumer, ConfluentProducer
 
 def _get_func(obj, func_name):
     func = getattr(obj, func_name, None)
@@ -76,3 +84,53 @@ class Runnable:
             _call_func(self, '_before_close')
             await self._close()
             _call_func(self, '_after_close')
+
+class ParallelRunnable:
+
+    def __init__(
+            self,
+            consumer: ConfluentConsumer,
+            producer: ConfluentProducer,
+            task_queue: Optional[queue.Queue],
+            total_consumer: int = 1,
+            total_producer: int = 1):
+
+        self.consumer = consumer
+        self.producer = producer
+        self.total_consumer = total_consumer
+        self.total_producer = total_producer
+        self.queue = task_queue if task_queue else queue.Queue()
+
+        self.consumer_tasks = []
+        self.producer_tasks = []
+
+    def run(self):
+        consumer_thread_pool = ThreadPoolExecutor(self.total_consumer)
+        producer_thread_pool = ThreadPoolExecutor(self.total_producer)
+
+        stop_event = Event()
+
+        try:
+            self.consumer_tasks = [
+                consumer_thread_pool.submit(
+                    self.consumer.start_consume,
+                    self.queue,
+                    stop_event)
+                for i in range(self.total_consumer)
+            ]
+            self.producer_tasks = [
+                producer_thread_pool.submit(
+                    self.producer.start_produce,
+                    self.queue,
+                    stop_event, i
+                ) for i in range(self.total_producer)
+            ]
+
+            while True:
+                time.sleep(10)
+
+        except KeyboardInterrupt:
+            stop_event.set()
+            consumer_thread_pool.shutdown(wait=False)
+            producer_thread_pool.shutdown(wait=False)
+

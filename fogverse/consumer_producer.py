@@ -1,16 +1,23 @@
 import asyncio
+from contextvars import  ContextVar, copy_context
+from logging import error
 import os
+from threading import Event
+import time
 import socket
 import sys
+from typing import Any
 import uuid
+import queue
 
 from aiokafka import (
     AIOKafkaConsumer as _AIOKafkaConsumer,
     AIOKafkaProducer as _AIOKafkaProducer
 )
+from confluent_kafka import Consumer, Message, Producer
 from .util import get_config
-from .fogverse_logging import FogVerseLogging
-from .base import AbstractConsumer, AbstractProducer
+from .fogverse_logging import FogVerseLogging, get_logger
+from .base import AbstractConsumer, AbstractProducer, Processor
 
 class AIOKafkaConsumer(AbstractConsumer):
     def __init__(self, loop=None):
@@ -102,6 +109,70 @@ class AIOKafkaProducer(AbstractProducer):
         logger = getattr(self, '_log', None)
         if isinstance(logger, FogVerseLogging):
             logger.std_log('Producer has closed.')
+
+
+class ConfluentConsumer:
+
+    def __init__(self,
+                 topics: list[str],
+                 kafka_server: str,
+                 consumer_extra_config: dict={},
+                 poll_time=1.0):
+
+        self.consumer = Consumer({
+            **consumer_extra_config,
+            "bootstrap.servers": kafka_server,
+        })
+
+        self.poll_time = poll_time
+        self.consumer.subscribe(topics)
+        self.queue = queue
+
+        self.log = get_logger()
+
+    def start_consume(self, queue: queue.Queue, stop_event: Event):
+        try:
+            while not stop_event.is_set():
+                message: Message = self.consumer.poll(self.poll_time)
+                queue.put(message)
+                print("Berhenti gak?")
+        except Exception as e:
+            self.log.error(e)
+
+
+class ConfluentProducer:
+
+    def __init__(self, 
+                 topic: str,
+                 kafka_server: str,
+                 processor: Processor,
+                 producer_extra_config: dict={}):
+        
+        self.producer = Producer({
+            **producer_extra_config,
+            "bootstrap.servers": kafka_server
+        })
+        self.processor = processor
+
+        self.topic = topic
+        self.queue = queue
+
+        self.log = get_logger()
+    
+    def start_produce(self, queue: queue.Queue, stop_event: Event, producer_id: int):
+        try:
+            while not stop_event.is_set():
+                message: Message= queue.get()
+                self.log.info(f"Producer {producer_id} is consuming the message")
+                value = self.processor.process(message)
+                self.producer.produce(
+                    topic=self.topic,
+                    value=value
+                )
+                queue.task_done()
+
+        except Exception as e: 
+            self.log.error(e)
 
 def _get_cv_video_capture(device=0):
     import cv2

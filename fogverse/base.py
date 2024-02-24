@@ -1,3 +1,6 @@
+
+from abc import ABC, abstractmethod
+from confluent_kafka import Message
 import asyncio
 import numpy as np
 import cv2
@@ -40,6 +43,12 @@ class AbstractConsumer:
         return data
 
     async def close_consumer(self):
+        pass
+
+class Processor(ABC):
+
+    @abstractmethod
+    def process(self, message: Message) -> bytes:
         pass
 
 class AbstractProducer:
