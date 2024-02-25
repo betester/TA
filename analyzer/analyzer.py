@@ -12,11 +12,13 @@ import torch.nn.functional as F
 class DisasterAnalyzerImpl(DisasterAnalyzer):
 
     def __init__(self, *model_source: Tuple[str, str]):
-        z
+        self._tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+        self._models = self._assign_model(*model_source)
         self.__log = get_logger(name=self.__class__.__name__)
 
 
     async def analyze(self, attribute: str, text: str) -> Optional[str]:
+        print(f'masuk teks {text}')
         try:
             tokenized_text = self._tokenizer.encode_plus(
                 text,
