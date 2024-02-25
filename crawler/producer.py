@@ -1,9 +1,5 @@
 
-from typing import Optional
 from aiokafka.client import asyncio
-
-from numpy import source
-
 from master.master import ProducerObserver
 
 from .crawler import Crawler, CrawlerResponse
@@ -41,7 +37,7 @@ class CrawlerProducer(Producer, Profiling):
             #     return data
             await asyncio.sleep(0.01)
             return CrawlerResponse(
-                message="Hello",
+                message="H" * 255,
                 source="Me"
             )
 
@@ -55,7 +51,7 @@ class CrawlerProducer(Producer, Profiling):
 
     async def send(self, data, topic=None, key=None, headers=None, callback=None):
         result = await super().send(data, topic, key, headers, callback)
-        self._observer.send_success_send_timestamp(self.producer_topic, self.producer)
+        self._observer.send_success_send_timestamp(self.producer_topic, self.producer, 1)
         return result
 
 

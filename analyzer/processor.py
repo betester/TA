@@ -11,29 +11,19 @@ class AnalyzerProcessor(Processor):
         self.analyzer = disaster_analyzer
         self.logger = get_logger()
 
-    def process(self, message: Message) -> bytes:
+    def process(self, messages: list[Message]) -> list[bytes]:
         try:
-            crawler_result = CrawlerResponse.model_validate_json(message.value())
+            crawler_results = list(map(lambda message : CrawlerResponse.model_validate_json(message.value()).message, messages))
+            disaster_messages = self.analyzer.analyze("is_disaster", crawler_results)
 
-            message_is_disaster = self.analyzer.analyze("is_disaster", crawler_result.message)
-
-            if message_is_disaster == "0":
-                return DisasterAnalyzerResponse(
-                        is_disaster=message_is_disaster,
-                        text=crawler_result.message
-                    ).model_dump_json().encode()
-
-            keyword_result = self.analyzer.analyze("keyword", crawler_result.message)
-
-            if keyword_result:
-                return DisasterAnalyzerResponse(
-                        keyword=keyword_result,
-                        is_disaster=message_is_disaster,
-                        text=crawler_result.message
-                    ).model_dump_json().encode()
-
-            return DisasterAnalyzerResponse().model_dump_json().encode()
+            return [
+                DisasterAnalyzerResponse(
+                    text=crawler_results[i],
+                    is_disaster=disaster_messages[i]
+                ).model_dump_json().encode() 
+                for i in range(len(crawler_results)
+            )]
 
         except Exception as e:
             self.logger.error(e)
-            return DisasterAnalyzerResponse().model_dump_json().encode()
+            return []

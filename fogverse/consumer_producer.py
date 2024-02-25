@@ -142,7 +142,8 @@ class ConfluentProducer:
                  topic: str,
                  kafka_server: str,
                  processor: Processor,
-                 producer_extra_config: dict={}):
+                 producer_extra_config: dict={},
+                 batch_size: int = 1):
         
         self.producer = Producer({
             **producer_extra_config,
@@ -153,12 +154,16 @@ class ConfluentProducer:
         self.topic = topic
         self.queue = queue
 
+        self.batch_size = batch_size
+
         self.log = get_logger()
     
-    def start_produce(self, queue: queue.Queue, stop_event: Event, on_complete: Callable[[str, Producer], None]):
+    def start_produce(self, queue: queue.Queue, stop_event: Event, on_complete: Callable[[str, Producer, int], None], thread_id: int):
         try:
+            message_batch: list[Message] = []
             while not stop_event.is_set():
-                message: Message= queue.get()
+                self.log.info(f"Thread {thread_id} receives the message")
+                message: Message = queue.get()
                 
                 if message is None:
                     continue
@@ -166,11 +171,20 @@ class ConfluentProducer:
                 elif message.error():
                     self.log.error(message.error())
 
+                message_batch.append(message)
+
+                if len(message_batch) < self.batch_size:
+                    continue
+
                 else:
-                    result: bytes = self.processor.process(message)
-                    self.producer.produce(topic=self.topic, value=result)
+                    total_messages = len(message_batch)
+                    results: list[bytes] = self.processor.process(message_batch)
+                    for result in results:
+                        self.producer.produce(topic=self.topic, value=result)
+                        self.producer.flush()
                     queue.task_done()
-                    on_complete(self.topic, self.producer)
+                    message_batch.clear()
+                    on_complete(self.topic, self.producer, total_messages)
 
         except Exception as e: 
             self.log.error(e)

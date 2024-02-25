@@ -59,7 +59,8 @@ class AnalyzerComponent:
         producer = ConfluentProducer(
             topic=self._producer_topic,
             kafka_server=self._producer_servers,
-            processor=analyzer_processor
+            processor=analyzer_processor,
+            batch_size=20
         )
 
         runnable = ParallelRunnable(

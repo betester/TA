@@ -112,10 +112,10 @@ class ProducerObserver:
                 value=self._input_output_pair_data_format(source_topic, target_topic)
             )
     
-    def send_success_send_timestamp(self, target_topic: str, producer: Producer):
+    def send_success_send_timestamp(self, target_topic: str, producer: Producer, total_messages: int):
         if target_topic is not None:
 
-            data = self._success_timestamp_data_format(target_topic)
+            data = self._success_timestamp_data_format(target_topic, total_messages)
             try:
                 producer.produce(
                     topic=self._producer_topic,
@@ -130,8 +130,9 @@ class ProducerObserver:
             target_topic=target_topic
         ).model_dump_json().encode()
         
-    def _success_timestamp_data_format(self, target_topic: str):
+    def _success_timestamp_data_format(self, target_topic: str, total_messages: int):
         return MachineConditionData(
             target_topic=target_topic,
+            total_messages=total_messages,
             timestamp=int(get_timestamp().timestamp())
         ).model_dump_json().encode()

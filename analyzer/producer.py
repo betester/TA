@@ -93,10 +93,9 @@ class AnalyzerProducer(Consumer, Producer):
         return result
 
 class ParallelAnalyzerJobService:
-    #TODO: add observer
     def __init__(self, runnable: ParallelRunnable):
         self.runnable = runnable
 
-    def start(self, on_producer_complete: Callable[[str, ConfluentProducer], None]):
+    def start(self, on_producer_complete: Callable[[str, ConfluentProducer, int], None]):
         self.runnable.run(on_producer_complete)
 

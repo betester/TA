@@ -17,3 +17,4 @@ class InputOutputThroughputPair(BaseModel):
 class MachineConditionData(BaseModel):
     target_topic: str
     timestamp: int
+    total_messages: int

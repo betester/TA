@@ -47,7 +47,7 @@ class Master(Consumer):
         elif isinstance(data, MachineConditionData): 
             source_topic = data.target_topic
             timestamps = self.topic_timestamps.get(source_topic, 0)
-            timestamps += 1
+            timestamps += data.total_messages
             self.topic_timestamps[source_topic] = timestamps
 
 
