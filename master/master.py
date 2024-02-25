@@ -1,4 +1,6 @@
 
+from collections.abc import Callable
+from typing import Any
 from aiokafka.client import asyncio
 from confluent_kafka.admin import (
     AdminClient,
@@ -102,27 +104,24 @@ class ProducerObserver:
         self._producer_topic = producer_topic 
 
 
-    def send_input_output_ratio_pair(self, source_topic: str, target_topic: str, producer: Producer):
+    def send_input_output_ratio_pair(self, source_topic: str, target_topic: str, send: Callable[[str, bytes], Any]):
         '''
         Identify which topic pair should the observer ratio with
+        send: a produce function from kafka
         '''
         if source_topic is not None:
-            producer.send(
-                topic=self._producer_topic,
-                value=self._input_output_pair_data_format(source_topic, target_topic)
+            return send(
+                self._producer_topic,
+                self._input_output_pair_data_format(source_topic, target_topic)
             )
     
-    def send_success_send_timestamp(self, target_topic: str, producer: Producer, total_messages: int):
+    def send_total_successful_messages(self, target_topic: str, total_messages: int, send: Callable[[str, bytes], Any]):
         if target_topic is not None:
-
             data = self._success_timestamp_data_format(target_topic, total_messages)
-            try:
-                producer.produce(
-                    topic=self._producer_topic,
-                    value=data
-                )
-            except Exception as e:
-                pass
+            return send(
+                self._producer_topic,
+                data
+            )
 
     def _input_output_pair_data_format(self, source_topic, target_topic: str):
         return InputOutputThroughputPair(

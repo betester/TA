@@ -158,7 +158,7 @@ class ConfluentProducer:
 
         self.log = get_logger()
     
-    def start_produce(self, queue: queue.Queue, stop_event: Event, on_complete: Callable[[str, Producer, int], None], thread_id: int):
+    def start_produce(self, queue: queue.Queue, stop_event: Event, on_complete: Callable[[str, int, Callable[[str, bytes], Any]], None], thread_id: int):
         try:
             message_batch: list[Message] = []
             while not stop_event.is_set():
@@ -184,7 +184,14 @@ class ConfluentProducer:
                         self.producer.flush()
                     queue.task_done()
                     message_batch.clear()
-                    on_complete(self.topic, self.producer, total_messages)
+                    on_complete(
+                        self.topic,
+                        total_messages,
+                        lambda x, y: self.producer.produce(
+                            topic=x,
+                            value=y
+                        )
+                    )
 
         except Exception as e: 
             self.log.error(e)

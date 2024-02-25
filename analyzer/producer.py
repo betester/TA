@@ -7,7 +7,7 @@ from .contract import DisasterAnalyzerResponse
 from crawler.contract import CrawlerResponse
 from fogverse import Producer, Consumer
 from fogverse.fogverse_logging import get_logger
-from typing import Optional
+from typing import Any, Optional
 from confluent_kafka import Producer as ConfluentProducer
 
 
@@ -58,16 +58,16 @@ class AnalyzerProducer(Consumer, Producer):
         else:
             await super()._start()
 
-        self._observer.send_input_output_ratio_pair(
+        await self._observer.send_input_output_ratio_pair(
             source_topic=self.consumer_topic,
             target_topic=self.producer_topic,
-            producer=self.producer
+            send = lambda x, y: self.producer.send(topic=x, value=y)
         )
 
 
     async def process(self, data: CrawlerResponse):
         try:
-            message_is_disaster = self._classifier_model.analyze("is_disaster", data.message)
+            message_is_disaster = self._classifier_model.analyze("is_disaster", [data.message])[0]
             
             if message_is_disaster == "0":
                 return DisasterAnalyzerResponse(
@@ -75,11 +75,11 @@ class AnalyzerProducer(Consumer, Producer):
                     text=data.message
                 )
 
-            keyword_result = self._classifier_model.analyze("keyword", data.message)
+            keyword_result = self._classifier_model.analyze("keyword", [data.message])
 
             if keyword_result:
                 return DisasterAnalyzerResponse(
-                   keyword=keyword_result,
+                   keyword=keyword_result[0],
                    is_disaster=message_is_disaster,
                    text=data.message
                 )
@@ -89,13 +89,17 @@ class AnalyzerProducer(Consumer, Producer):
 
     async def send(self, data, topic=None, key=None, headers=None, callback=None):
         result = await super().send(data, topic, key, headers, callback)
-        self._observer.send_success_send_timestamp(target_topic=self.producer_topic, producer=self.producer)
+        self._observer.send_total_successful_messages(
+            target_topic=self.producer_topic,
+            send = lambda x, y: self.producer.send(topic=x, value=y),
+            total_messages = 1
+        )
         return result
 
 class ParallelAnalyzerJobService:
     def __init__(self, runnable: ParallelRunnable):
         self.runnable = runnable
 
-    def start(self, on_producer_complete: Callable[[str, ConfluentProducer, int], None]):
+    def start(self, on_producer_complete: Callable[[str, int, Callable[[str, bytes], Any]], None]):
         self.runnable.run(on_producer_complete)
 

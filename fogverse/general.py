@@ -6,7 +6,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor, wait
 import queue
 import traceback
-from typing import Optional
+from typing import Any, Optional
 
 from confluent_kafka import Producer
 
@@ -107,7 +107,7 @@ class ParallelRunnable:
         self.consumer_tasks = []
         self.producer_tasks = []
 
-    def run(self, on_producer_complete: Callable[[str, Producer, int], None]):
+    def run(self, on_producer_complete: Callable[[str, int, Callable[[str, bytes], Any]], None]):
         consumer_thread_pool = ThreadPoolExecutor(self.total_consumer)
         producer_thread_pool = ThreadPoolExecutor(self.total_producer)
 

@@ -51,7 +51,11 @@ class CrawlerProducer(Producer, Profiling):
 
     async def send(self, data, topic=None, key=None, headers=None, callback=None):
         result = await super().send(data, topic, key, headers, callback)
-        self._observer.send_success_send_timestamp(self.producer_topic, self.producer, 1)
+        await self._observer.send_total_successful_messages(
+            self.producer_topic,
+            1,
+            lambda x, y: self.producer.send(topic=x, value=y)
+        )
         return result
 
 
