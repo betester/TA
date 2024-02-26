@@ -10,7 +10,7 @@ class MasterComponent:
     def consumer_auto_scaler(self):
         
         bootstrap_host = str(get_config("KAFKA_ADMIN_HOST", self, "localhost"))
-        sleep_time = int(str(get_config("SLEEP_TIME", self, 4)))
+        sleep_time = int(str(get_config("SLEEP_TIME", self, 3)))
 
 
         kafka_admin=AdminClient(

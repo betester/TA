@@ -8,7 +8,7 @@ async def main():
     analyzer_component = AnalyzerComponent()
     master_component = MasterComponent()
 
-    mode = get_config("ANALYZER_MODE", default="serial").strip()
+    mode = get_config("ANALYZER_MODE", default="parallel").strip()
 
     producer_observer = master_component.producer_observer()
     if mode == "parallel":
