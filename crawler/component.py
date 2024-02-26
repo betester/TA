@@ -5,7 +5,7 @@ from master.master import ProducerObserver
 
 from .crawler import MockUpCrawler
 from .contract import CrawlerResponse
-from .producer import CrawlerProducer
+from .handler import CrawlerProducer
 from fogverse.util import get_config
 
 class CrawlerComponent:
