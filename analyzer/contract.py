@@ -14,5 +14,5 @@ class DisasterAnalyzerResponse(BaseModel):
 class DisasterAnalyzer(ABC):
 
     @abstractmethod
-    async def analyze(self, attribute: str, text: str) -> Optional[str]:
+    def analyze(self, attribute: str, text: list[str]) -> list[str]:
         pass

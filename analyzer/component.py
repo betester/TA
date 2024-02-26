@@ -1,8 +1,11 @@
 from typing import Optional
+from analyzer.processor import AnalyzerProcessor
+from fogverse.consumer_producer import ConfluentConsumer, ConfluentProducer
+from fogverse.general import ParallelRunnable
 from fogverse.util import get_config
-from master.master import ConsumerAutoScaler
+from master.master import ConsumerAutoScaler, ProducerObserver
 from .analyzer import DisasterAnalyzerImpl
-from .handler import AnalyzerProducer
+from .producer import AnalyzerProducer, ParallelAnalyzerJobService
 
 class AnalyzerComponent:
 
@@ -16,7 +19,7 @@ class AnalyzerComponent:
         self._disaster_classifier_model_source = ("is_disaster", str(get_config("DISASTER_CLASSIFIER_MODEL_SOURCE", self, "./mocking_bird")))
         self._keyword_classifier_model_source = ("keyword", str(get_config("KEYWORD_CLASSIFIER_MODEL_SOURCE", self, "./jay_bird")))
 
-    def disaster_analyzer(self, consumer_auto_scaler: Optional[ConsumerAutoScaler]):
+    def disaster_analyzer(self, consumer_auto_scaler: Optional[ConsumerAutoScaler], producer_observer: ProducerObserver):
         
         disaster_analyzers = DisasterAnalyzerImpl(
             self._disaster_classifier_model_source,
@@ -30,7 +33,42 @@ class AnalyzerComponent:
             consumer_servers=self._consumer_servers, 
             classifier_model=disaster_analyzers,
             consumer_group_id=self._consumer_group_id,
-            consumer_auto_scaler=consumer_auto_scaler
+            consumer_auto_scaler=consumer_auto_scaler,
+            producer_observer=producer_observer
         )
 
         return analyzer_producer
+    
+    def parallel_disaster_analyzer(self):
+
+        disaster_analyzers = DisasterAnalyzerImpl(
+            self._disaster_classifier_model_source
+        )
+
+        analyzer_processor = AnalyzerProcessor(disaster_analyzers)
+
+        consumer = ConfluentConsumer(
+            topics=[self._consumer_topic],
+            kafka_server=self._consumer_servers,
+            consumer_extra_config={
+                'auto.offset.reset': 'latest',
+                'group.id': self._consumer_group_id
+            }
+        )
+
+        producer = ConfluentProducer(
+            topic=self._producer_topic,
+            kafka_server=self._producer_servers,
+            processor=analyzer_processor,
+            batch_size=20
+        )
+
+        runnable = ParallelRunnable(
+            consumer,
+            producer,
+            None,
+            total_producer=5
+        )
+
+        return ParallelAnalyzerJobService(runnable)
+

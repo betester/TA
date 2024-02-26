@@ -12,13 +12,15 @@ import torch.nn.functional as F
 class DisasterAnalyzerImpl(DisasterAnalyzer):
 
     def __init__(self, *model_source: Tuple[str, str]):
-        z
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self._models: dict[str, BertForSequenceClassification] = self._assign_model(*model_source)
+        self._tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+        self._tokenizer
         self.__log = get_logger(name=self.__class__.__name__)
 
-
-    async def analyze(self, attribute: str, text: str) -> Optional[str]:
+    def analyze(self, attribute: str, text: list[str]) -> list[str]:
         try:
-            tokenized_text = self._tokenizer.encode_plus(
+            tokenized_text = self._tokenizer.batch_encode_plus(
                 text,
                 max_length=64,
                 add_special_tokens=True,
@@ -28,6 +30,7 @@ class DisasterAnalyzerImpl(DisasterAnalyzer):
                 return_attention_mask=True, 
                 return_tensors='pt'
             )
+            tokenized_text.to(self.device)
             model = self._models[attribute]
             id2label = model.config.id2label 
             
@@ -35,20 +38,19 @@ class DisasterAnalyzerImpl(DisasterAnalyzer):
                 outputs = model(**tokenized_text)
                 # Get the predicted class
                 out = F.softmax(outputs.logits, dim=1)
-                predicted_class = torch.argmax(out, dim=1)[0].item()
-
-                return id2label[predicted_class]
-
+                predicted_classes = torch.argmax(out, dim=1)
+                return [id2label[i.item()] for i in predicted_classes] 
 
         except Exception as e:
             self.__log.error(e)
+            return []
 
     def _assign_model(self, *model_sources: Tuple[str, str]) -> dict[str, BertForSequenceClassification]:
         
         models: dict[str, BertForSequenceClassification] = {}
-
         for attribute, model_source in model_sources:
             model = BertForSequenceClassification.from_pretrained(model_source)
             if type(model) == BertForSequenceClassification:
+                model.to(self.device)
                 models[attribute] = model
         return models

@@ -1,4 +1,6 @@
 
+from collections.abc import Callable
+from typing import Any
 from aiokafka.client import asyncio
 from confluent_kafka.admin import (
     AdminClient,
@@ -9,7 +11,9 @@ from confluent_kafka.admin import (
 from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
 
 from fogverse.fogverse_logging import get_logger
-from confluent_kafka import  TopicCollection
+from confluent_kafka import Producer, TopicCollection
+from fogverse.util import get_timestamp
+from master.contract import InputOutputThroughputPair, MachineConditionData
 
 class ConsumerAutoScaler:
 
@@ -94,3 +98,40 @@ class ConsumerAutoScaler:
             self._logger.info("Successfully assigned, consuming")
             await consumer.seek_to_end()
 
+class ProducerObserver:
+
+    def __init__(self, producer_topic: str):
+        self._producer_topic = producer_topic 
+
+
+    def send_input_output_ratio_pair(self, source_topic: str, target_topic: str, send: Callable[[str, bytes], Any]):
+        '''
+        Identify which topic pair should the observer ratio with
+        send: a produce function from kafka
+        '''
+        if source_topic is not None:
+            return send(
+                self._producer_topic,
+                self._input_output_pair_data_format(source_topic, target_topic)
+            )
+    
+    def send_total_successful_messages(self, target_topic: str, total_messages: int, send: Callable[[str, bytes], Any]):
+        if target_topic is not None:
+            data = self._success_timestamp_data_format(target_topic, total_messages)
+            return send(
+                self._producer_topic,
+                data
+            )
+
+    def _input_output_pair_data_format(self, source_topic, target_topic: str):
+        return InputOutputThroughputPair(
+            source_topic=source_topic,
+            target_topic=target_topic
+        ).model_dump_json().encode()
+        
+    def _success_timestamp_data_format(self, target_topic: str, total_messages: int):
+        return MachineConditionData(
+            target_topic=target_topic,
+            total_messages=total_messages,
+            timestamp=int(get_timestamp().timestamp())
+        ).model_dump_json().encode()
