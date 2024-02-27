@@ -35,7 +35,6 @@ class AnalyzerProducer(Consumer, Producer):
         self._consumer_auto_scaler = consumer_auto_scaler
         self._closed = False
 
-
     def decode(self, data: bytes) -> CrawlerResponse:
         return CrawlerResponse.model_validate_json(data)
         

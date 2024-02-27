@@ -18,7 +18,7 @@ class DisasterAnalyzerImpl(DisasterAnalyzer):
 
 
     async def analyze(self, attribute: str, text: str) -> Optional[str]:
-        print(f'masuk teks {text}')
+        print(f'Got: {text}')
         try:
             tokenized_text = self._tokenizer.encode_plus(
                 text,
