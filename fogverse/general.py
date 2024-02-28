@@ -118,7 +118,8 @@ class ParallelRunnable:
                 consumer_thread_pool.submit(
                     self.consumer.start_consume,
                     self.queue,
-                    stop_event)
+                    stop_event
+                )
                 for i in range(self.total_consumer)
             ]
 

@@ -53,6 +53,7 @@ class AnalyzerComponent:
             group_id=self._consumer_group_id,
             consumer_auto_scaler=consumer_auto_scaler,
             consumer_extra_config={
+                'session.timeout.ms': 6000,
                 'auto.offset.reset': 'latest'
             }
         )

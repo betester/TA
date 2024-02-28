@@ -14,7 +14,6 @@ from aiokafka import (
 )
 from confluent_kafka import Consumer, Message, Producer
 
-from master.master import ConsumerAutoScaler
 from .util import get_config
 from .fogverse_logging import FogVerseLogging, get_logger
 from .base import AbstractConsumer, AbstractProducer, Processor
@@ -117,35 +116,42 @@ class ConfluentConsumer:
                  topics: str,
                  kafka_server: str,
                  group_id: str,
-                 consumer_auto_scaler: Optional[ConsumerAutoScaler],
+                 consumer_auto_scaler,
                  consumer_extra_config: dict={},
                  poll_time=1.0
                  ):
 
-        self.consumer = Consumer({
-            **consumer_extra_config,
-            "bootstrap.servers": kafka_server,
-            'group.id': group_id
-        })
-
+        self.consumer_extra_config = consumer_extra_config
+        self.kafka_server = kafka_server
+        self.group_id = group_id
         self.poll_time = poll_time
+        self.consumer_auto_scaler = consumer_auto_scaler
+        self.topics = topics
 
-        if consumer_auto_scaler is not None:
-            consumer_auto_scaler.start(
-                self.consumer,
-                topics,
-                group_id
-            )
-        else:
-            self.consumer.subscribe([topics])
         self.queue = queue
-
         self.log = get_logger()
 
     def start_consume(self, queue: queue.Queue, stop_event: Event):
+
+        consumer = Consumer({
+            **self.consumer_extra_config,
+            "bootstrap.servers": self.kafka_server,
+            'group.id': self.group_id
+        })
+
+
+        if self.consumer_auto_scaler is not None:
+            self.consumer_auto_scaler.start(
+                consumer,
+                stop_event,
+                self.topics,
+                self.group_id
+        )
+        else:
+            consumer.subscribe([self.topics])
         try:
             while not stop_event.is_set():
-                message: Message = self.consumer.poll(self.poll_time)
+                message: Message = consumer.poll(self.poll_time)
                 queue.put(message)
         except Exception as e:
             self.log.error(e)

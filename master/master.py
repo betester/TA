@@ -1,4 +1,5 @@
 
+from asyncio import Event
 import time
 
 from collections.abc import Callable
@@ -14,8 +15,7 @@ from confluent_kafka.admin import (
 )
 from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
 
-from fogverse.fogverse_logging import get_logger
-from confluent_kafka import  Consumer, KafkaException, TopicCollection
+from confluent_kafka import Consumer, KafkaException, TopicCollection
 from fogverse.util import get_timestamp
 from master.contract import InputOutputThroughputPair, MachineConditionData
 
@@ -25,9 +25,9 @@ class ConsumerAutoScaler:
     
     def __init__(self, kafka_admin: AdminClient, sleep_time: int, initial_total_partition: int=1):
         self._kafka_admin = kafka_admin
-        self._logger = get_logger(name=self.__class__.__name__)
         self._sleep_time = sleep_time
         self._initial_total_partition = initial_total_partition
+        self.consumer_is_assigned = False
     
 
     def _group_id_total_consumer(self, group_id: str) -> int:
@@ -38,6 +38,7 @@ class ConsumerAutoScaler:
     def _topic_id_total_partition(self, topic_id: str) -> int:
         topic_future_description = self._kafka_admin.describe_topics(TopicCollection([topic_id]))[topic_id]
         topic_description: TopicDescription = topic_future_description.result()
+        print(topic_description)
         return len(topic_description.partitions)
     
 
@@ -56,11 +57,11 @@ class ConsumerAutoScaler:
                 topic_future_description.result()
                 return True
             except KafkaException as e:
-                error = e.exception.args[0]
+                error = e.args[0]
                 if error.code() == KafkaError.UNKNOWN_TOPIC_OR_PART or not error.retriable():
                     return False
-                self._logger.error(e)
-                self._logger.info("Retrying to check if topic exist")
+                print(e)
+                print("Retrying to check if topic exist")
 
             total_retry += 1
             time.sleep(self._sleep_time)
@@ -79,20 +80,20 @@ class ConsumerAutoScaler:
                     )
                 ])[topic_id]
                 create_topic_future.result()
-                self._logger.info(f"{topic_id} is created")
+                print(f"{topic_id} is created")
                 return True
 
             except KafkaException as e:
                 error = e.exception.args[0]
                 
                 if error.code() == KafkaError.TOPIC_ALREADY_EXISTS:
-                    self._logger.info(f"{topic_id} already created")
+                    print(f"{topic_id} already created")
                     return True
 
-                self._logger.error(e)
+                print(e)
                 if not error.retriable():
                     return False
-                self._logger.info(f"Retrying creating topic {topic_id}")
+                print(f"Retrying creating topic {topic_id}")
                 total_retry += 1
                 time.sleep(self._sleep_time)
 
@@ -100,49 +101,60 @@ class ConsumerAutoScaler:
 
     def start(self,
               consumer: Consumer,
+              stop_event: Event,
               topic_id: str,
               group_id: str,
-              retry_topic_creation: int=3):
+              /,
+              retry_attempt: int=3):
 
-        if not self._topic_exist(topic_id, retry_topic_creation):
-            topic_created = self._create_topic(topic_id, retry_topic_creation)
+        print("Creating topic if not exist")
+
+        if not self._topic_exist(topic_id, retry_attempt):
+            topic_created = self._create_topic(topic_id, retry_attempt)
             if not topic_created:
                 raise Exception("Topic cannot be created")
 
         partition_is_enough = False
-        consumer.subscribe([topic_id])
-
-        while not partition_is_enough:
+        total_retry = 0
+    
+        while not partition_is_enough and not stop_event.is_set() and total_retry <= retry_attempt:
             try:
                 group_id_total_consumer = self._group_id_total_consumer(group_id) 
                 topic_id_total_partition = self._topic_id_total_partition(topic_id)
 
-                self._logger.info(f"\ngroup_id_total_consumer: {group_id_total_consumer}\ntopic_id_total_partition:{topic_id_total_partition}")
+                print(f"\ngroup_id_total_consumer: {group_id_total_consumer}\ntopic_id_total_partition:{topic_id_total_partition}")
 
                 partition_is_enough = topic_id_total_partition >= group_id_total_consumer
 
                 if not partition_is_enough:
-                    self._logger.info(f"Adding {group_id_total_consumer} partition to topic {topic_id}")
+                    print(f"Adding {group_id_total_consumer} partition to topic {topic_id}")
                     self._add_partition_on_topic(topic_id, group_id_total_consumer)
 
             except Exception as e:
-                self._logger.error(e)
-                
+                print(e)
+            
+            total_retry += 1
             time.sleep(self._sleep_time)
 
-        while len(consumer.assignment()) == 0:
-            self._logger.info("No partition assigned for retrying")
-            consumer.unsubscribe()
-            consumer.subscribe([topic_id])
+        if total_retry > retry_attempt:
+            raise Exception("Fail adding partition to topic")
+        
 
-        self._logger.info("Successfully assigned, consuming")
+        # print("Subscribing to topic")
+        # consumer.subscribe(
+        #     topics=[topic_id], 
+        #     on_assign = self.on_consumer_assigned
+        # )
 
+        while not self.consumer_is_assigned and not stop_event.is_set():
+            time.sleep(self._sleep_time)
 
-
+    def on_consumer_assigned(self, consumer, partitions):
+        print(f"Consumer assigned to topic, consuming")
+        self.consumer_is_assigned = True
 
     async def async_start(self, *args, **kwargs):
 
-        
         async with ConsumerAutoScaler.lock: 
 
             partition_is_enough = False
@@ -159,40 +171,40 @@ class ConsumerAutoScaler:
                 raise Exception("Consumer does not exist")
 
             if producer_exist:
-                self._logger.info("Starting producer")
+                print("Starting producer")
                 await producer.start()
 
             # initial start
-            self._logger.info("Starting consumer")
+            print("Starting consumer")
             await consumer.start()
             while not partition_is_enough:
                 try:
                     group_id_total_consumer = self._group_id_total_consumer(consumer_group) 
                     topic_id_total_partition = self._topic_id_total_partition(consumer_topic)
 
-                    self._logger.info(f"\ngroup_id_total_consumer: {group_id_total_consumer}\ntopic_id_total_partition:{topic_id_total_partition}")
+                    print(f"\ngroup_id_total_consumer: {group_id_total_consumer}\ntopic_id_total_partition:{topic_id_total_partition}")
 
                     partition_is_enough = topic_id_total_partition >= group_id_total_consumer
 
                     if not partition_is_enough:
-                        self._logger.info(f"Adding {group_id_total_consumer} partition to topic {consumer_topic}")
+                        print(f"Adding {group_id_total_consumer} partition to topic {consumer_topic}")
                         self._add_partition_on_topic(consumer_topic, group_id_total_consumer)
 
                 except Exception as e:
-                    self._logger.error(e)
+                    print(e)
 
                     
                 await asyncio.sleep(self._sleep_time)
             
 
             while len(consumer.assignment()) == 0:
-                self._logger.info("No partition assigned for retrying")
+                print("No partition assigned for retrying")
                 consumer.unsubscribe()
                 consumer.subscribe([consumer_topic])
                 await asyncio.sleep(self._sleep_time)
 
 
-            self._logger.info("Successfully assigned, consuming")
+            print("Successfully assigned, consuming")
             await consumer.seek_to_end()
 
 class ProducerObserver:
