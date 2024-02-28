@@ -5,7 +5,7 @@ from crawler import CrawlerResponse
 import asyncio
 import threading
 
-TOKEN = 'actually forgot to remove token, but it is not valid anymore.'
+TOKEN = 'ODg3MjUwODg5ODc2ODYwOTQ4.GKGfrq.xMLjgl79pDZcyutxczN2O53Un-zsH_JaNvF8tw'
 PRODUCER_TOPIC = "analyze_v1"
 PRODUCER_SERVERS = "localhost:9092"
 CONSUMER_GROUP_ID = "crawler"
@@ -21,9 +21,8 @@ class DiscordProducer(Producer, Profiling):
         Profiling.__init__(self, name='discord-logs', dirname='discord-logs')
 
     async def receive(self):
-        await asyncio.sleep(0.01)
         try:
-            data = self.messages.get_nowait()
+            data = await self.messages.get()
             return CrawlerResponse(
                 message=data,
                 source="discord"
@@ -37,10 +36,11 @@ class DiscordProducer(Producer, Profiling):
     
 
 class Jigglypuff(discord.Client):
-    def __init__(self, intents, messages):
+    def __init__(self, intents, messages, producer):
         super().__init__(intents=intents)
         self.messages = messages
         self.__log = get_logger(name=self.__class__.__name__)
+        self.producer = producer
 
     async def on_ready(self):
         self.__log.info(f'{self.user} has connected to Discord!')
@@ -50,21 +50,28 @@ class Jigglypuff(discord.Client):
             return
 
         self.__log.info(f"Message from {message.author}: {message.content}")
-        self.messages.put_nowait(message.content)
+        await self.messages.put(message.content)
 
-if __name__ == "__main__":
+
+    async def setup_hook(self):
+        self.loop.create_task(
+            self.producer.run()
+        )
+
+
+async def main():
+
     messages = asyncio.Queue()
     intents = discord.Intents.all()
 
     # run both the client and the producer without blocking
-    jigglypuff = Jigglypuff(intents, messages)
+
     discord_producer = DiscordProducer(messages)
+    jigglypuff = Jigglypuff(intents, messages, discord_producer)
 
-    threading.Thread(target=jigglypuff.run, args=(TOKEN,), daemon=True).start()
+    await jigglypuff.start(TOKEN)
 
-    loop = asyncio.get_event_loop()
-    producer_task = loop.create_task(discord_producer.run())
-    threading.Thread(target=loop.run_until_complete, args=(producer_task,), daemon=True).start()
 
-    while True:
-        pass
+
+if __name__ == "__main__":
+    asyncio.run(main())
