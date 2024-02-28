@@ -5,7 +5,7 @@ from crawler import CrawlerResponse
 import asyncio
 import threading
 
-TOKEN = 'ODg3MjUwODg5ODc2ODYwOTQ4.GKGfrq.xMLjgl79pDZcyutxczN2O53Un-zsH_JaNvF8tw'
+TOKEN = 'Forgor again :skull:'
 PRODUCER_TOPIC = "analyze_v1"
 PRODUCER_SERVERS = "localhost:9092"
 CONSUMER_GROUP_ID = "crawler"
