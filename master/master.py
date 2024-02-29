@@ -34,6 +34,7 @@ class ConsumerAutoScaler:
     def _group_id_total_consumer(self, group_id: str) -> int:
         group_future_description = self._kafka_admin.describe_consumer_groups([group_id])[group_id]
         group_description: ConsumerGroupDescription = group_future_description.result()
+        print(group_description.members)
         return len(group_description.members)
     
     def _topic_id_total_partition(self, topic_id: str) -> int:
@@ -108,6 +109,7 @@ class ConsumerAutoScaler:
               retry_attempt: int=3):
 
         print("Creating topic if not exist")
+        self.topic_id = topic_id
 
         if not self._topic_exist(topic_id, retry_attempt):
             topic_created = self._create_topic(topic_id, retry_attempt)
@@ -143,8 +145,15 @@ class ConsumerAutoScaler:
             if self.consumer_is_assigned:
                 return
 
-            self.consumer_is_assigned = True
             committed_messages = consumer.committed(partitions)
+            if len(committed_messages) == 0:
+                print("Failed to be assigned, retrying")
+                consumer.unsubscribe()
+                consumer.subscribe(
+                    topics=[self.topic_id], 
+                    on_assign = self.on_consumer_assigned
+                )
+                return
             least_offset = min(map(lambda x: x.offset, committed_messages))
 
             if  least_offset != ConsumerAutoScaler.OFFSET_OUT_OF_RANGE:
@@ -152,8 +161,10 @@ class ConsumerAutoScaler:
                 consumer.seek(committed_messages[least_offset_index])
 
             print(f"Consumer is assigned, consuming")
+            self.consumer_is_assigned = True
         except Exception as e:
             print(e)
+
 
     def on_revoke(self, consumer, partitions):
         #TODO: handle if needed in the future
