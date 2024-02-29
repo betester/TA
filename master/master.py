@@ -1,6 +1,6 @@
 
-from asyncio import Event
 import time
+import functools
 
 from collections.abc import Callable
 from typing import Any
@@ -22,6 +22,7 @@ from master.contract import InputOutputThroughputPair, MachineConditionData
 class ConsumerAutoScaler:
 
     lock = asyncio.Lock()
+    OFFSET_OUT_OF_RANGE = -1001 
     
     def __init__(self, kafka_admin: AdminClient, sleep_time: int, initial_total_partition: int=1):
         self._kafka_admin = kafka_admin
@@ -101,7 +102,6 @@ class ConsumerAutoScaler:
 
     def start(self,
               consumer: Consumer,
-              stop_event: Event,
               topic_id: str,
               group_id: str,
               /,
@@ -114,10 +114,15 @@ class ConsumerAutoScaler:
             if not topic_created:
                 raise Exception("Topic cannot be created")
 
-        partition_is_enough = False
-        total_retry = 0
-    
-        while not partition_is_enough and not stop_event.is_set() and total_retry <= retry_attempt:
+        print(f"Subscribing to topic {topic_id}")
+        consumer.subscribe(
+            topics=[topic_id], 
+            on_assign = functools.partial(self.on_consumer_assigned, topic_id),
+            on_lost = self.on_lost,
+            on_revoke = self.on_revoke
+        )
+
+        while not self.consumer_is_assigned:
             try:
                 group_id_total_consumer = self._group_id_total_consumer(group_id) 
                 topic_id_total_partition = self._topic_id_total_partition(topic_id)
@@ -130,28 +135,31 @@ class ConsumerAutoScaler:
                     print(f"Adding {group_id_total_consumer} partition to topic {topic_id}")
                     self._add_partition_on_topic(topic_id, group_id_total_consumer)
 
+                consumer.poll(self._sleep_time)
             except Exception as e:
                 print(e)
-            
-            total_retry += 1
-            time.sleep(self._sleep_time)
 
-        if total_retry > retry_attempt:
-            raise Exception("Fail adding partition to topic")
-        
-
-        # print("Subscribing to topic")
-        # consumer.subscribe(
-        #     topics=[topic_id], 
-        #     on_assign = self.on_consumer_assigned
-        # )
-
-        while not self.consumer_is_assigned and not stop_event.is_set():
-            time.sleep(self._sleep_time)
-
-    def on_consumer_assigned(self, consumer, partitions):
-        print(f"Consumer assigned to topic, consuming")
+    def on_consumer_assigned(self, topic_id, consumer, partitions):
         self.consumer_is_assigned = True
+
+        committed_messages = consumer.committed(partitions)
+        least_offset = min(map(lambda x: x.offset, committed_messages))
+
+        if  least_offset != ConsumerAutoScaler.OFFSET_OUT_OF_RANGE:
+            least_offset_index = committed_messages.index(least_offset)
+            consumer.seek(committed_messages[least_offset_index])
+
+        print(f"Consumer assigned to topic {topic_id}, consuming")
+
+    def on_revoke(self, consumer, partitions):
+        #TODO: handle if needed in the future
+        print("Got revoked")
+        print(consumer,partitions)
+
+    def on_lost(self, consumer, partitions):
+        #TODO: handle if needed in the future
+        print("Got lost")
+        print(consumer, partitions)
 
     async def async_start(self, *args, **kwargs):
 
