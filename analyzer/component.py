@@ -5,14 +5,14 @@ from fogverse.general import ParallelRunnable
 from fogverse.util import get_config
 from master.master import ConsumerAutoScaler, ProducerObserver
 from .analyzer import DisasterAnalyzerImpl
-from .producer import AnalyzerProducer, ParallelAnalyzerJobService
+from .handler import AnalyzerProducer, ParallelAnalyzerJobService
 
 class AnalyzerComponent:
 
     def __init__(self):
         self._producer_topic = str(get_config("ANALYZER_PRODUCER_TOPIC", self, "client_v6"))
         self._producer_servers = str(get_config("ANALYZER_PRODUCER_SERVERS", self, "localhost:9092"))
-        self._consumer_topic = str(get_config("ANALYZER_CONSUMER_TOPIC", self, "analyze_v1"))
+        self._consumer_topic = str(get_config("ANALYZER_CONSUMER_TOPIC", self, "xi"))
         self._consumer_servers = str(get_config("ANALYZER_CONSUMER_SERVERS", self, "localhost:9092"))
         self._consumer_group_id = str(get_config("ANALYZER_CONSUMER_GROUP_ID", self, "analyzer_v2"))
         # assigns based on the attribute and model source
@@ -39,7 +39,7 @@ class AnalyzerComponent:
 
         return analyzer_producer
     
-    def parallel_disaster_analyzer(self):
+    def parallel_disaster_analyzer(self, consumer_auto_scaler: ConsumerAutoScaler):
 
         disaster_analyzers = DisasterAnalyzerImpl(
             self._disaster_classifier_model_source
@@ -48,11 +48,12 @@ class AnalyzerComponent:
         analyzer_processor = AnalyzerProcessor(disaster_analyzers)
 
         consumer = ConfluentConsumer(
-            topics=[self._consumer_topic],
+            topics=self._consumer_topic,
             kafka_server=self._consumer_servers,
+            group_id=self._consumer_group_id,
+            consumer_auto_scaler=consumer_auto_scaler,
             consumer_extra_config={
-                'auto.offset.reset': 'latest',
-                'group.id': self._consumer_group_id
+                'auto.offset.reset': 'latest'
             }
         )
 

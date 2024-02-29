@@ -129,6 +129,8 @@ _null = _Null()
 
 def get_config(config_name: str, cls: object=None, default=None):
     ret = os.getenv(config_name, _null)
-    if not isinstance(ret, _Null): return ret
-    if cls is None: return ret or default
+    if not isinstance(ret, _Null): 
+        return ret
+    if cls is None: 
+        return default or ret
     return getattr(cls, config_name.lower(), default)

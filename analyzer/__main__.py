@@ -8,17 +8,21 @@ async def main():
     analyzer_component = AnalyzerComponent()
     master_component = MasterComponent()
 
-    mode = get_config("ANALYZER_MODE", default="serial").strip()
+    mode = get_config("ANALYZER_MODE", default="parallel").strip()
 
+    consumer_auto_scaler = master_component.consumer_auto_scaler()
     producer_observer = master_component.producer_observer()
+
     if mode == "parallel":
-        analyzer_event_handler = analyzer_component.parallel_disaster_analyzer()
+        analyzer_event_handler = analyzer_component.parallel_disaster_analyzer(
+            consumer_auto_scaler
+        )
         analyzer_event_handler.start(producer_observer.send_total_successful_messages)
 
     elif mode == "serial":
         await analyzer_component.disaster_analyzer(
-            master_component.consumer_auto_scaler(),
-            master_component.producer_observer()
+            consumer_auto_scaler,
+            producer_observer
         ).run()
         
 

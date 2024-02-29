@@ -4,6 +4,7 @@ from threading import Event
 import socket
 import sys
 from typing import Any
+from typing_extensions import Optional
 import uuid
 import queue
 
@@ -12,6 +13,7 @@ from aiokafka import (
     AIOKafkaProducer as _AIOKafkaProducer
 )
 from confluent_kafka import Consumer, Message, Producer
+
 from .util import get_config
 from .fogverse_logging import FogVerseLogging, get_logger
 from .base import AbstractConsumer, AbstractProducer, Processor
@@ -111,23 +113,36 @@ class AIOKafkaProducer(AbstractProducer):
 class ConfluentConsumer:
 
     def __init__(self,
-                 topics: list[str],
+                 topics: str,
                  kafka_server: str,
+                 group_id: str,
+                 consumer_auto_scaler,
                  consumer_extra_config: dict={},
-                 poll_time=1.0):
+                 poll_time=1.0
+                 ):
+
+        self.poll_time = poll_time
 
         self.consumer = Consumer({
             **consumer_extra_config,
             "bootstrap.servers": kafka_server,
+            'group.id': group_id
         })
 
-        self.poll_time = poll_time
-        self.consumer.subscribe(topics)
-        self.queue = queue
+        if consumer_auto_scaler is not None:
+            consumer_auto_scaler.start(
+                self.consumer,
+                topics,
+                group_id
+        )
+        else:
+            self.consumer.subscribe([topics])
 
+        self.queue = queue
         self.log = get_logger()
 
     def start_consume(self, queue: queue.Queue, stop_event: Event):
+
         try:
             while not stop_event.is_set():
                 message: Message = self.consumer.poll(self.poll_time)
