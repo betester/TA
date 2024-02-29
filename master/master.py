@@ -117,9 +117,7 @@ class ConsumerAutoScaler:
         print(f"Subscribing to topic {topic_id}")
         consumer.subscribe(
             topics=[topic_id], 
-            on_assign = functools.partial(self.on_consumer_assigned, topic_id),
-            on_lost = self.on_lost,
-            on_revoke = self.on_revoke
+            on_assign = self.on_consumer_assigned
         )
 
         while not self.consumer_is_assigned:
@@ -139,17 +137,23 @@ class ConsumerAutoScaler:
             except Exception as e:
                 print(e)
 
-    def on_consumer_assigned(self, topic_id, consumer, partitions):
-        self.consumer_is_assigned = True
+    def on_consumer_assigned(self, consumer, partitions):
 
-        committed_messages = consumer.committed(partitions)
-        least_offset = min(map(lambda x: x.offset, committed_messages))
+        try:
+            if self.consumer_is_assigned:
+                return
 
-        if  least_offset != ConsumerAutoScaler.OFFSET_OUT_OF_RANGE:
-            least_offset_index = committed_messages.index(least_offset)
-            consumer.seek(committed_messages[least_offset_index])
+            self.consumer_is_assigned = True
+            committed_messages = consumer.committed(partitions)
+            least_offset = min(map(lambda x: x.offset, committed_messages))
 
-        print(f"Consumer assigned to topic {topic_id}, consuming")
+            if  least_offset != ConsumerAutoScaler.OFFSET_OUT_OF_RANGE:
+                least_offset_index = committed_messages.index(least_offset)
+                consumer.seek(committed_messages[least_offset_index])
+
+            print(f"Consumer is assigned, consuming")
+        except Exception as e:
+            print(e)
 
     def on_revoke(self, consumer, partitions):
         #TODO: handle if needed in the future
