@@ -3,6 +3,8 @@ from master.event_handler import Master
 from master.master import ConsumerAutoScaler, ProducerObserver
 from confluent_kafka.admin import AdminClient
 
+from master.worker import InputOutputRatioWorker, StatisticWorker
+
 
 
 class MasterComponent:
@@ -34,10 +36,19 @@ class MasterComponent:
         consumer_group_id = str(get_config("OBSERVER_CONSUMER_GROUP_ID", self, "observer"))
         scheduler_time = int(str(get_config("SCHEDULER_TIME", self, 60)))
 
+        statistic_worker = StatisticWorker(maximum_seconds=300)
+        input_output_worker = InputOutputRatioWorker(
+            refresh_rate_second=60,
+            input_output_ratio_threshold=0.7,
+            below_threshold_callback=lambda _: print("BAHAYA LOHH")
+        )
+
+        workers = [statistic_worker, input_output_worker]
+
         return Master(
             consumer_topic=consumer_topic,
             consumer_group_id=consumer_group_id,
             consumer_servers=consumer_servers,
-            scheduler_time=scheduler_time
+            observers=workers
         )
 

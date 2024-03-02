@@ -10,6 +10,7 @@ class Master(ABC):
     def add_new_consumer(self, topic_id, group_id):
         pass
 
+
 class InputOutputThroughputPair(BaseModel):
     source_topic: str
     target_topic: str
@@ -18,3 +19,13 @@ class MachineConditionData(BaseModel):
     target_topic: str
     timestamp: int
     total_messages: int
+
+class MasterObserver(ABC):
+
+    @abstractmethod
+    def on_receive(self, data: InputOutputThroughputPair |  MachineConditionData):
+        pass
+
+    @abstractmethod
+    async def start(self):
+        pass

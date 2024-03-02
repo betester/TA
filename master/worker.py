@@ -1,10 +1,12 @@
 
+from collections.abc import Callable
 from aiokafka.client import asyncio
 import logging
 
 from aiokafka.conn import functools
+from master.contract import InputOutputThroughputPair, MachineConditionData, MasterObserver
 
-class StatisticWorker:
+class StatisticWorker(MasterObserver):
 
     def __init__(self, maximum_seconds: int, refresh_rate: float = 1):
         '''
@@ -30,10 +32,12 @@ class StatisticWorker:
         self._stop = False
 
     
-    def on_receive_topic(self, topic: str, total_messages: int):
-        topic_current_count = self._topics_current_count.get(topic, 0)
-        topic_current_count += total_messages
-        self._topics_current_count[topic] = topic_current_count
+    def on_receive(self, data: InputOutputThroughputPair | MachineConditionData):
+        if isinstance(data, InputOutputThroughputPair):
+            return
+        topic_current_count = self._topics_current_count.get(data.target_topic, 0)
+        topic_current_count += data.total_messages
+        self._topics_current_count[data.target_topic] = topic_current_count
 
     def _add_observed_topic_counts(self, topic, total_counts: int):
         observed_counts = self._topics_observed_counts.get(topic, [])
@@ -85,3 +89,71 @@ class StatisticWorker:
     
     def stop(self):
         self._stop = True
+
+class InputOutputRatioWorker(MasterObserver):
+
+    def __init__(
+            self,
+            refresh_rate_second: float,
+            input_output_ratio_threshold: float,
+            below_threshold_callback: Callable
+        ):
+        '''
+        Worker that helps for counting input output ratio of topic
+        refresh_rate_second (second) : How frequent the worker will check whether to deploy an instance or not.
+        input_output_ratio_threshold : Ranging from 0.0 to 1.0, if the ratio is below the threshold and fulfill certain criteria, it will deploy a new instance 
+        '''
+
+        assert refresh_rate_second > 0
+        assert input_output_ratio_threshold > 0
+        assert input_output_ratio_threshold <= 1
+        
+        self._refresh_rate_second = refresh_rate_second
+        self._input_output_ratio_threshold = input_output_ratio_threshold
+        self._below_threshold_callback = below_threshold_callback
+
+        self._topics_current_count: dict[str, int] = {} 
+        self._topics_throughput_pair: dict[str, list[str]] = {}
+
+
+        self.logger = logging.getLogger(self.__class__.__name__)
+        logger_format = logging.Formatter(fmt='[%(asctime)s][%(levelname)s][%(name)s] %(message)s')
+        handler = logging.StreamHandler()
+        handler.setFormatter(logger_format)
+        self.logger.addHandler(handler)
+
+        self._stop = False
+        
+    
+    def on_receive(self, data: InputOutputThroughputPair | MachineConditionData):
+        if isinstance(data, InputOutputThroughputPair):
+            target_topics = self._topics_throughput_pair.get(data.source_topic, [])
+            target_topics.append(data.target_topic)
+            self._topics_throughput_pair[data.source_topic] = target_topics
+        else:
+            topic_current_count = self._topics_current_count.get(data.target_topic, 0)
+            topic_current_count += data.total_messages
+            self._topics_current_count[data.target_topic] = topic_current_count
+
+    async def start(self):
+
+        while not self._stop:
+            await asyncio.sleep(self._refresh_rate_second)
+            for source_topic, target_topics in self._topics_throughput_pair.items():
+                source_topic_throughput = self._topics_current_count.get(source_topic, 0)
+                for target_topic in target_topics:
+                    target_topic_throughput = self._topics_current_count.get(target_topic, 0)
+                    throughput_ratio = target_topic_throughput/max(source_topic_throughput, 1)
+
+                    if throughput_ratio == target_topic_throughput:
+                        self.logger.error(f"Source topic {source_topic} throughput is {source_topic_throughput}, the machine might be dead")
+
+                    if throughput_ratio < self._input_output_ratio_threshold:
+                        self._below_threshold_callback(target_topic)
+
+            for topic, throughput in self._topics_current_count.items():
+                self.logger.info(f"Topic {topic} total message in {self._topics_current_count} seconds: {throughput}")
+                self._topics_current_count[topic] = 0
+            
+    def stop(self):
+        self._stop = False
