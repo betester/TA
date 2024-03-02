@@ -1,4 +1,6 @@
 
+import socket
+
 from collections.abc import Callable
 from analyzer import DisasterAnalyzer
 from fogverse.general import ParallelRunnable
@@ -8,7 +10,6 @@ from crawler.contract import CrawlerResponse
 from fogverse import Producer, Consumer
 from fogverse.fogverse_logging import get_logger
 from typing import Any, Optional
-from confluent_kafka import Producer as ConfluentProducer
 
 
 class AnalyzerProducer(Consumer, Producer):
@@ -40,6 +41,8 @@ class AnalyzerProducer(Consumer, Producer):
         self._observer = producer_observer
         self._closed = False
 
+        self.client_id = socket.gethostname()
+
 
     def decode(self, data: bytes) -> CrawlerResponse:
         return CrawlerResponse.model_validate_json(data)
@@ -49,7 +52,7 @@ class AnalyzerProducer(Consumer, Producer):
 
     async def _start(self):
         if self._consumer_auto_scaler:
-            await self._consumer_auto_scaler._start(
+            await self._consumer_auto_scaler.async_start(
                 consumer=self.consumer,
                 consumer_group=self.group_id,
                 consumer_topic=self.consumer_topic,

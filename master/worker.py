@@ -1,5 +1,6 @@
 
-from collections.abc import Callable
+from collections.abc import Callable, Coroutine
+from typing import Any
 from aiokafka.client import asyncio
 import logging
 
@@ -22,12 +23,6 @@ class StatisticWorker(MasterObserver):
         self._refresh_rate = refresh_rate   
         self._topics_current_count: dict[str, int] = {} 
         self._topics_observed_counts: dict[str, list[int]] = {}
-        self.logger = logging.getLogger(self.__class__.__name__)
-
-        logger_format = logging.Formatter(fmt='[%(asctime)s][%(levelname)s][%(name)s] %(message)s')
-        handler = logging.StreamHandler()
-        handler.setFormatter(logger_format)
-        self.logger.addHandler(handler)
 
         self._stop = False
 
@@ -50,7 +45,7 @@ class StatisticWorker(MasterObserver):
 
 
     async def start(self):
-
+        print("Starting statistic worker")
         while not self._stop:
             await asyncio.sleep(self._refresh_rate)
             
@@ -64,7 +59,7 @@ class StatisticWorker(MasterObserver):
             total_observed_counts = sum(topic_observed_count)
             return total_observed_counts/len(topic_observed_count)
         except Exception as e:
-            self.logger.info(e)
+            print(e)
             return 0
 
     def get_topic_standard_deviation(self, topic: str) -> float:
@@ -84,7 +79,7 @@ class StatisticWorker(MasterObserver):
             return topic_variance**(1/2)
 
         except Exception as e:
-            self.logger.info(e)
+            print(e)
             return 0
     
     def stop(self):
@@ -96,11 +91,11 @@ class InputOutputRatioWorker(MasterObserver):
             self,
             refresh_rate_second: float,
             input_output_ratio_threshold: float,
-            below_threshold_callback: Callable
+            below_threshold_callback: Callable[[str, int], Coroutine[Any, Any, bool]]
         ):
         '''
         Worker that helps for counting input output ratio of topic
-        refresh_rate_second (second) : How frequent the worker will check whether to deploy an instance or not.
+        refresh_rate_second (second) : How frequent the worker will count the ratio between input and output ratio.
         input_output_ratio_threshold : Ranging from 0.0 to 1.0, if the ratio is below the threshold and fulfill certain criteria, it will deploy a new instance 
         '''
 
@@ -114,13 +109,6 @@ class InputOutputRatioWorker(MasterObserver):
 
         self._topics_current_count: dict[str, int] = {} 
         self._topics_throughput_pair: dict[str, list[str]] = {}
-
-
-        self.logger = logging.getLogger(self.__class__.__name__)
-        logger_format = logging.Formatter(fmt='[%(asctime)s][%(levelname)s][%(name)s] %(message)s')
-        handler = logging.StreamHandler()
-        handler.setFormatter(logger_format)
-        self.logger.addHandler(handler)
 
         self._stop = False
         
@@ -136,7 +124,7 @@ class InputOutputRatioWorker(MasterObserver):
             self._topics_current_count[data.target_topic] = topic_current_count
 
     async def start(self):
-
+        print("Starting input output ratio worker")
         while not self._stop:
             await asyncio.sleep(self._refresh_rate_second)
             for source_topic, target_topics in self._topics_throughput_pair.items():
@@ -146,14 +134,14 @@ class InputOutputRatioWorker(MasterObserver):
                     throughput_ratio = target_topic_throughput/max(source_topic_throughput, 1)
 
                     if throughput_ratio == target_topic_throughput:
-                        self.logger.error(f"Source topic {source_topic} throughput is {source_topic_throughput}, the machine might be dead")
+                        print(f"Source topic {source_topic} throughput is {source_topic_throughput}, the machine might be dead")
 
                     if throughput_ratio < self._input_output_ratio_threshold:
-                        self._below_threshold_callback(target_topic)
+                        await self._below_threshold_callback(target_topic, target_topic_throughput)
 
             for topic, throughput in self._topics_current_count.items():
-                self.logger.info(f"Topic {topic} total message in {self._topics_current_count} seconds: {throughput}")
+                print(f"Topic {topic} total message in {self._topics_current_count} seconds: {throughput}")
                 self._topics_current_count[topic] = 0
             
     def stop(self):
-        self._stop = False
+        self._stop = True 

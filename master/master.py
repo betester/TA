@@ -1,10 +1,11 @@
 
 import time
-import functools
 
-from collections.abc import Callable
-from typing import Any
+from collections.abc import Callable, Coroutine
+from typing import Any, Optional
 from aiokafka.client import asyncio
+from aiokafka.conn import functools
+from aiokafka.protocol.admin import Boolean
 from confluent_kafka.admin import (
     AdminClient,
     ConsumerGroupDescription,
@@ -17,7 +18,7 @@ from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
 
 from confluent_kafka import Consumer, KafkaException, TopicCollection
 from fogverse.util import get_timestamp
-from master.contract import InputOutputThroughputPair, MachineConditionData
+from master.contract import InputOutputThroughputPair, MachineConditionData, MasterObserver
 
 class ConsumerAutoScaler:
 
@@ -247,7 +248,12 @@ class ProducerObserver:
                 self._input_output_pair_data_format(source_topic, target_topic)
             )
     
-    def send_total_successful_messages(self, target_topic: str, total_messages: int, send: Callable[[str, bytes], Any]):
+    def send_total_successful_messages(
+            self,
+            target_topic: str,
+            total_messages: int,
+            send: Callable[[str, bytes], Any]
+        ):
         if target_topic is not None:
             data = self._success_timestamp_data_format(target_topic, total_messages)
             return send(
@@ -267,3 +273,65 @@ class ProducerObserver:
             total_messages=total_messages,
             timestamp=int(get_timestamp().timestamp())
         ).model_dump_json().encode()
+
+class AutoDeployer:
+
+    def __init__(
+            self,
+            deploy_command: Callable[[str], Coroutine[Any, Any, Boolean]],
+            should_be_deployed : Callable[[str, int] ,Boolean],
+            deploy_delay: int,
+            machine_ids: list[str],
+            topic_machine_consumer: dict[str, set[str]]
+        ):
+        self._deploy_command = deploy_command
+        self._should_be_deployed = should_be_deployed
+        self._deploy_delay = deploy_delay
+        self._machine_total_deployment: dict[str, int] = {machine_id : 0 for machine_id in machine_ids}
+        self._topic_machine_consumer: dict[str, set[str]] = topic_machine_consumer
+        self.can_deploy = True
+        self._deploy_timestamp = -1
+
+
+    async def delay_deploy(self):
+        await asyncio.sleep(self._deploy_delay)
+        self.can_deploy = True
+
+    def get_machine_id(self, topic_id) -> str:
+        machine_ids = self._topic_machine_consumer[topic_id]
+        machine_current_min_total_deploy_id = None
+        min_total_deploy = -1
+
+        for machine_id in machine_ids:
+            if self._machine_total_deployment[machine_id] < min_total_deploy:
+                min_total_deploy = self._machine_total_deployment[machine_id]
+                machine_current_min_total_deploy_id = machine_id
+
+        if not machine_current_min_total_deploy_id:
+            raise Exception(f"No machine for topic {topic_id}")
+
+        return machine_current_min_total_deploy_id
+    
+    async def deploy(self, topic_id: str, total_calls: int) -> bool:
+        try:
+            if not self.can_deploy:
+                time_remaining = get_timestamp() - self.deploy_time
+                print(f"Cannot be deployed yet, time remaining: {time_remaining}")
+                return False
+
+            if self._should_be_deployed(topic_id, total_calls):
+                machine_id = self.get_machine_id(topic_id)
+                deployed = await self._deploy_command(machine_id)
+                self.can_deploy = False
+                self.deploy_time = get_timestamp()
+                asyncio.create_task(self.delay_deploy())
+
+                if deployed:
+                    self._machine_total_deployment[machine_id] += 1
+                    return True
+            
+            print("Machine should not be deployed, could be a spike")
+            return False
+        except Exception as e:
+            print(e)
+            return False
