@@ -22,6 +22,7 @@ class MachineConditionData(BaseModel):
     total_messages: int
     
 class CloudProvider(StrEnum):
+    LOCAL = "LOCAL"
     GOOGLE_CLOUD = "GOOGLE_CLOUD" 
     AWS = "AWS"
 

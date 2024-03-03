@@ -15,7 +15,16 @@ from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
 
 from confluent_kafka import Consumer, KafkaException, TopicCollection
 from fogverse.util import get_timestamp
-from master.contract import DeployResult, InputOutputThroughputPair, MachineConditionData, MasterObserver, TopicDeployDelay, TopicDeploymentConfig, TopicStatistic
+from master.contract import (
+    CloudProvider,
+    DeployResult, 
+    InputOutputThroughputPair, 
+    MachineConditionData, 
+    MasterObserver,
+    TopicDeployDelay, 
+    TopicDeploymentConfig, 
+    TopicStatistic
+)
 
 class ConsumerAutoScaler:
 
@@ -276,11 +285,30 @@ class ProducerObserver:
             timestamp=int(get_timestamp().timestamp())
         ).model_dump_json().encode()
 
+class DeployScripts:
+
+    def __init__(self):
+        self._deploy_functions: dict[CloudProvider, Callable[[TopicDeploymentConfig], Coroutine[Any, Any, DeployResult]]] = {}
+        self._deploy_functions[CloudProvider.LOCAL] = self._local_deployment
+        self._deploy_functions[CloudProvider.GOOGLE_CLOUD] = self._gooogle_deployment
+
+    def get_deploy_functions(self, cloud_provider: CloudProvider):
+        return self._deploy_functions[cloud_provider]
+
+    def set_deploy_functions(self, cloud_provider: CloudProvider, deploy_function: Callable[[TopicDeploymentConfig], Coroutine[Any, Any, DeployResult]]):
+        self._deploy_functions[cloud_provider] = deploy_function
+
+    async def _local_deployment(self, configs: TopicDeploymentConfig) -> DeployResult:
+        pass
+
+    async def _gooogle_deployment(self, configs: TopicDeploymentConfig) -> DeployResult:
+        pass
+
 class AutoDeployer(MasterObserver):
 
     def __init__(
             self,
-            deploy_machine: Callable[[TopicDeploymentConfig], Coroutine[Any, Any, DeployResult]],
+            deploy_script: DeployScripts,
             should_be_deployed : Callable[[str, int] ,bool],
             deploy_delay: int
         ):
@@ -297,7 +325,7 @@ class AutoDeployer(MasterObserver):
                 be deployed after several attempts based on this delay.
         """
 
-        self._deploy_machine = deploy_machine
+        self._deploy_scripts = deploy_script
         self._should_be_deployed = should_be_deployed
         self._deploy_delay = deploy_delay
 
@@ -338,7 +366,10 @@ class AutoDeployer(MasterObserver):
                     return False
 
                 if self._should_be_deployed(source_topic, source_total_calls):
-                    deploy_result = await self._deploy_machine(self._topic_deployment_configs[target_topic])
+                    machine_deployer = self._deploy_scripts.get_deploy_functions(
+                        self._topic_deployment_configs[target_topic].cloud_deploy_configs.provider
+                    )
+                    deploy_result = await machine_deployer(self._topic_deployment_configs[target_topic])
                     self._machine_ids.append(deploy_result)
                     self._can_deploy_topic[target_topic].can_be_deployed = False
                     self._can_deploy_topic[target_topic].deployed_timestamp = get_timestamp()
@@ -370,3 +401,4 @@ class TopicSpikeChecker:
         print(f"Topic {topic_id} statistics:\nMean: {mean}\nStandard Deviation: {std}\nZ-Score:{z_score}")
         #TODO: put explanation probably whether it's most likely can be deployed or not
         return z_score > z_threshold
+
