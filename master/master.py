@@ -281,7 +281,7 @@ class AutoDeployer:
             deploy_command: Callable[[str], Coroutine[Any, Any, Boolean]],
             should_be_deployed : Callable[[str, int] ,Boolean],
             deploy_delay: int,
-            machine_ids: list[str],
+            machine_ids: set[str],
             topic_machine_consumer: dict[str, set[str]]
         ):
         self._deploy_command = deploy_command

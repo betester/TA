@@ -1,3 +1,6 @@
+
+import json
+
 from fogverse.util import get_config
 from master.event_handler import Master
 from master.master import AutoDeployer, ConsumerAutoScaler, ProducerObserver
@@ -8,6 +11,14 @@ from master.worker import InputOutputRatioWorker, StatisticWorker
 
 
 class MasterComponent:
+
+    def __init__(self):
+        self.local_machine_ids = ['local'] 
+        self.local_topic_machine_consumer: dict[str, list[str]] = {
+            'analyze': self.local_machine_ids,
+            'crawler': self.local_machine_ids,
+            'client' : self.local_machine_ids
+        }
 
     def consumer_auto_scaler(self):
         
@@ -30,6 +41,7 @@ class MasterComponent:
         observer_topic = str(get_config("OBSERVER_TOPIC", self, "observer"))
         return ProducerObserver(observer_topic)
 
+
     async def mock_deploy(self, string: str) -> Boolean:
         return True
 
@@ -41,13 +53,18 @@ class MasterComponent:
         consumer_servers = str(get_config("OBSERVER_CONSUMER_SERVERS", self, "localhost:9092"))
         consumer_group_id = str(get_config("OBSERVER_CONSUMER_GROUP_ID", self, "observer"))
         deploy_delay = int(str(get_config("DEPLOY_DELAY", self, 60)))
+        machine_input = str(get_config("MACHINE_IDS", self, json.dumps(self.local_machine_ids)))
+        topic_machine_input = str(get_config("TOPIC_MACHINE_CONSUMER", self, json.dumps(self.local_topic_machine_consumer)))
+
+        machine_ids: set[str] = set(json.loads(machine_input))
+        topic_machine_consumer : dict[str, set[str]] = { topic_id: set(machine_ids) for topic_id, machine_ids in json.loads(topic_machine_input).items()}
 
         auto_deployer = AutoDeployer(
             deploy_command=self.mock_deploy,
             should_be_deployed=self.mock_should_be_deployed,
             deploy_delay=deploy_delay,
-            machine_ids=[],
-            topic_machine_consumer={}
+            machine_ids=machine_ids,
+            topic_machine_consumer=topic_machine_consumer
         )
 
         statistic_worker = StatisticWorker(maximum_seconds=300)
