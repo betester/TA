@@ -2,9 +2,10 @@
 from abc import ABC, abstractmethod
 import asyncio
 from asyncio.locks import Lock
+from collections.abc import Callable, Coroutine
 from datetime import datetime
 from enum import StrEnum
-from typing import Optional
+from typing import Any, Optional
 
 from pydantic import BaseModel
 
@@ -44,6 +45,10 @@ class TopicDeployDelay(BaseModel):
     can_be_deployed: bool
     deployed_timestamp: datetime
     lock: asyncio.Lock = Lock()
+
+class DeployResult(BaseModel):
+    machine_id: str
+    shut_down_machine: Callable[[str], Coroutine[Any, Any, bool]] 
 
 
 class MasterObserver(ABC):

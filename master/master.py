@@ -15,7 +15,7 @@ from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
 
 from confluent_kafka import Consumer, KafkaException, TopicCollection
 from fogverse.util import get_timestamp
-from master.contract import InputOutputThroughputPair, MachineConditionData, MasterObserver, TopicDeployDelay, TopicDeploymentConfig, TopicStatistic
+from master.contract import DeployResult, InputOutputThroughputPair, MachineConditionData, MasterObserver, TopicDeployDelay, TopicDeploymentConfig, TopicStatistic
 
 class ConsumerAutoScaler:
 
@@ -280,7 +280,7 @@ class AutoDeployer(MasterObserver):
 
     def __init__(
             self,
-            deploy_machine: Callable[[TopicDeploymentConfig], Coroutine[Any, Any, Tuple[str, Callable[[str], Any]]]],
+            deploy_machine: Callable[[TopicDeploymentConfig], Coroutine[Any, Any, DeployResult]],
             should_be_deployed : Callable[[str, int] ,bool],
             deploy_delay: int
         ):
@@ -302,7 +302,7 @@ class AutoDeployer(MasterObserver):
         self._deploy_delay = deploy_delay
 
         self._topic_deployment_configs: dict[str, TopicDeploymentConfig] = {}
-        self._machine_ids: list[Tuple[str, Callable]] = []
+        self._machine_ids: list[DeployResult] = []
         self._can_deploy_topic: dict[str, TopicDeployDelay] = {}
 
     async def delay_deploy(self, topic_id: str):
@@ -338,8 +338,8 @@ class AutoDeployer(MasterObserver):
                     return False
 
                 if self._should_be_deployed(source_topic, source_total_calls):
-                    deployed_machine_id, turn_off_machine = await self._deploy_machine(self._topic_deployment_configs[target_topic])
-                    self._machine_ids.append((deployed_machine_id, turn_off_machine))
+                    deploy_result = await self._deploy_machine(self._topic_deployment_configs[target_topic])
+                    self._machine_ids.append(deploy_result)
                     self._can_deploy_topic[target_topic].can_be_deployed = False
                     self._can_deploy_topic[target_topic].deployed_timestamp = get_timestamp()
                     asyncio.create_task(self.delay_deploy(target_topic))
@@ -353,8 +353,8 @@ class AutoDeployer(MasterObserver):
             return False
     
     async def stop(self):
-        for machine_id, turn_off_machine in self._machine_ids:
-            await turn_off_machine(machine_id)
+        for deploy_result in self._machine_ids:
+            await deploy_result.shut_down_machine(deploy_result.machine_id)
 
 class TopicSpikeChecker:
 

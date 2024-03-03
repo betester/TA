@@ -2,7 +2,7 @@
 from collections.abc import Callable, Coroutine
 from typing import Tuple
 from fogverse.util import get_config
-from master.contract import TopicDeploymentConfig
+from master.contract import DeployResult, TopicDeploymentConfig
 from master.event_handler import Master
 from master.master import AutoDeployer, ConsumerAutoScaler, ProducerObserver, TopicSpikeChecker
 from confluent_kafka.admin import AdminClient
@@ -43,9 +43,12 @@ class MasterComponent:
         observer_topic = str(get_config("OBSERVER_TOPIC", self, "observer"))
         return ProducerObserver(observer_topic)
 
-    async def mock_deploy(self, topic_configs: TopicDeploymentConfig) -> Tuple[str, Callable]:
+    async def mock_deploy(self, topic_configs: TopicDeploymentConfig) -> DeployResult:
         print(f"Deploying {topic_configs.topic_id}")
-        return "mock", lambda x : print(f"Turn off {x}")
+        return DeployResult(
+            machine_id="mock",
+            shut_down_machine= lambda x : True 
+        )
     
     def master_event_handler(self):
         consumer_topic = str(get_config("OBSERVER_CONSUMER_TOPIC", self, "observer"))
