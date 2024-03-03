@@ -322,6 +322,11 @@ class AutoDeployer(MasterObserver):
     
     async def deploy(self, source_topic: str, source_total_calls: int, target_topic: str) -> bool:
         try:
+            
+            if target_topic not in self._can_deploy_topic:
+                print(f"Topic {target_topic} does not exist, might be not sending heartbeat during initial start")
+                return False
+
             async with self._can_deploy_topic[target_topic].lock:
                 if not self._can_deploy_topic[target_topic].can_be_deployed:
                     time_remaining = get_timestamp() - self._can_deploy_topic[target_topic].deployed_timestamp
