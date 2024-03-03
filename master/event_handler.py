@@ -45,3 +45,12 @@ class Master(Consumer):
         consumer_task = asyncio.create_task(super()._start())
         print("Starting master")
         await asyncio.gather(*observer_tasks, consumer_task)
+
+    async def close_consumer(self):
+
+        for observer in self._observers:
+            await observer.stop()
+
+        await super().close_consumer()
+
+

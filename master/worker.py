@@ -81,7 +81,7 @@ class StatisticWorker(MasterObserver, TopicStatistic):
             print(e)
             return 0
     
-    def stop(self):
+    async def stop(self):
         self._stop = True
 
 class InputOutputRatioWorker(MasterObserver):
@@ -144,5 +144,5 @@ class InputOutputRatioWorker(MasterObserver):
                 print(f"Topic {topic} total message in {self._topics_current_count} seconds: {throughput}")
                 self._topics_current_count[topic] = 0
             
-    def stop(self):
+    async def stop(self):
         self._stop = True 

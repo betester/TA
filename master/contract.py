@@ -1,5 +1,8 @@
 
 from abc import ABC, abstractmethod
+import asyncio
+from asyncio.locks import Lock
+from datetime import datetime
 from enum import StrEnum
 from typing import Optional
 
@@ -37,6 +40,12 @@ class InputOutputThroughputPair(BaseModel):
     target_topic: str
     deploy_configs: Optional[TopicDeploymentConfig] = None
 
+class TopicDeployDelay(BaseModel):
+    can_be_deployed: bool
+    deployed_timestamp: datetime
+    lock: asyncio.Lock = Lock()
+
+
 class MasterObserver(ABC):
 
     @abstractmethod
@@ -45,6 +54,10 @@ class MasterObserver(ABC):
 
     @abstractmethod
     async def start(self):
+        pass
+
+    @abstractmethod
+    async def stop(self):
         pass
 
 class TopicStatistic(ABC):

@@ -14,8 +14,9 @@ from confluent_kafka.admin import (
 from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
 
 from confluent_kafka import Consumer, KafkaException, TopicCollection
+from cv2.gapi.streaming import timestamp
 from fogverse.util import get_timestamp
-from master.contract import InputOutputThroughputPair, MachineConditionData, MasterObserver, TopicDeploymentConfig, TopicStatistic
+from master.contract import InputOutputThroughputPair, MachineConditionData, MasterObserver, TopicDeployDelay, TopicDeploymentConfig, TopicStatistic
 
 class ConsumerAutoScaler:
 
@@ -279,19 +280,30 @@ class AutoDeployer(MasterObserver):
             should_be_deployed : Callable[[str, int] ,bool],
             deploy_delay: int
         ):
-        self._deploy_command = deploy_machine
+        """
+        A class to facilitate the auto deployment process for each consumer topic.
+
+        Args:
+            deploy_machine (Callable): A function used to deploy based on topic configurations. The topic configuration
+                must include the topic consumer. It should return two things: machine_id and a callback function for
+                shutting down the machine.
+            should_be_deployed (Callable): A function that receives topic_id and topic_throughput. Use this function to
+                decide when a topic machine should be deployed.
+            deploy_delay (int): Delay (in seconds) for topic deployment. Even if a topic's throughput is still low, it won't
+                be deployed after several attempts based on this delay.
+        """
+
+        self._deploy_machine = deploy_machine
         self._should_be_deployed = should_be_deployed
         self._deploy_delay = deploy_delay
-        self.can_deploy = True
-        self._deploy_timestamp = -1
-
 
         self._topic_deployment_configs: dict[str, TopicDeploymentConfig] = {}
         self._machine_ids: list[Tuple[str, Callable]] = []
+        self._can_deploy_topic: dict[str, TopicDeployDelay] = {}
 
-    async def delay_deploy(self):
+    async def delay_deploy(self, topic_id: str):
         await asyncio.sleep(self._deploy_delay)
-        self.can_deploy = True
+        self._can_deploy_topic[topic_id].can_be_deployed = True
 
 
     def on_receive(self, data: InputOutputThroughputPair | MachineConditionData):
@@ -300,28 +312,33 @@ class AutoDeployer(MasterObserver):
         
         if data.deploy_configs:
             self._topic_deployment_configs[data.source_topic] = data.deploy_configs
+            self._can_deploy_topic[data.source_topic] = TopicDeployDelay(
+                can_be_deployed=True,
+                deployed_timestamp=get_timestamp()
+            )
 
     async def start(self):
         pass
     
     async def deploy(self, source_topic: str, source_total_calls: int, target_topic: str) -> bool:
         try:
-            if not self.can_deploy:
-                time_remaining = get_timestamp() - self.deploy_time
-                print(f"Cannot be deployed yet, time remaining: {time_remaining}")
+            async with self._can_deploy_topic[target_topic].lock:
+                if not self._can_deploy_topic[target_topic].can_be_deployed:
+                    time_remaining = get_timestamp() - self._can_deploy_topic[target_topic].deployed_timestamp
+                    print(f"Cannot be deployed yet, time remaining: {time_remaining}")
+                    return False
+
+                if self._should_be_deployed(source_topic, source_total_calls):
+                    deployed_machine_id, turn_off_machine = await self._deploy_machine(self._topic_deployment_configs[target_topic])
+                    self._machine_ids.append((deployed_machine_id, turn_off_machine))
+                    self._can_deploy_topic[target_topic].can_be_deployed = False
+                    self._can_deploy_topic[target_topic].deployed_timestamp = get_timestamp()
+                    asyncio.create_task(self.delay_deploy(target_topic))
+                    return True
+            
+                print("Machine should not be deployed, could be a spike")
                 return False
 
-            if self._should_be_deployed(source_topic, source_total_calls):
-                deployed_machine_id, turn_off_machine = await self._deploy_command(self._topic_deployment_configs[target_topic])
-                self._machine_ids.append((deployed_machine_id, turn_off_machine))
-
-                self.can_deploy = False
-                self.deploy_time = get_timestamp()
-                asyncio.create_task(self.delay_deploy())
-                return True
-            
-            print("Machine should not be deployed, could be a spike")
-            return False
         except Exception as e:
             print(e)
             return False
