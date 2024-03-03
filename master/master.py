@@ -337,4 +337,4 @@ def topic_is_outlier(topic_statistic: TopicStatistic, z_threshold: int, topic_id
 
     print(f"Topic {topic_id} statistics:\nMean: {mean}\nStandard Deviation: {std}\nZ-Score:{z_score}")
     #TODO: put explanation probably whether it's most likely can be deployed or not
-    return abs(z_score) > z_threshold
+    return z_score > z_threshold
