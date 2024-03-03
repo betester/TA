@@ -24,12 +24,12 @@ class CloudProvider(StrEnum):
     GOOGLE_CLOUD = "GOOGLE_CLOUD" 
     AWS = "AWS"
 
-class CloudDeployConfigs:
+class CloudDeployConfigs(BaseModel):
     provider: CloudProvider = CloudProvider.GOOGLE_CLOUD
     zone: str
     env: dict[str, str]
 
-class TopicDeploymentConfig:
+class TopicDeploymentConfig(BaseModel):
     topic_id: str
     service_name: str
     cloud_deploy_configs: CloudDeployConfigs
@@ -38,7 +38,7 @@ class TopicDeploymentConfig:
 class InputOutputThroughputPair(BaseModel):
     source_topic: str
     target_topic: str
-    deploy_configs: Optional[TopicDeploymentConfig] = None
+    deploy_configs: TopicDeploymentConfig 
 
 class TopicDeployDelay(BaseModel):
     can_be_deployed: bool

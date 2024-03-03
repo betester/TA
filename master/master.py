@@ -14,7 +14,6 @@ from confluent_kafka.admin import (
 from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
 
 from confluent_kafka import Consumer, KafkaException, TopicCollection
-from cv2.gapi.streaming import timestamp
 from fogverse.util import get_timestamp
 from master.contract import InputOutputThroughputPair, MachineConditionData, MasterObserver, TopicDeployDelay, TopicDeploymentConfig, TopicStatistic
 
@@ -235,7 +234,7 @@ class ProducerObserver:
         self._producer_topic = producer_topic 
 
 
-    def send_input_output_ratio_pair(self, source_topic: str, target_topic: str, send: Callable[[str, bytes], Any]):
+    def send_input_output_ratio_pair(self, source_topic: str, target_topic: str, send: Callable[[str, bytes], Any], topic_configs: TopicDeploymentConfig):
         '''
         Identify which topic pair should the observer ratio with
         send: a produce function from kafka
@@ -243,7 +242,11 @@ class ProducerObserver:
         if source_topic is not None:
             return send(
                 self._producer_topic,
-                self._input_output_pair_data_format(source_topic, target_topic)
+                self._input_output_pair_data_format(
+                    source_topic,
+                    target_topic,
+                    topic_configs
+                )
             )
     
     def send_total_successful_messages(
@@ -259,10 +262,11 @@ class ProducerObserver:
                 data
             )
 
-    def _input_output_pair_data_format(self, source_topic, target_topic: str):
+    def _input_output_pair_data_format(self, source_topic, target_topic: str, deploy_configs: TopicDeploymentConfig):
         return InputOutputThroughputPair(
             source_topic=source_topic,
-            target_topic=target_topic
+            target_topic=target_topic,
+            deploy_configs=deploy_configs
         ).model_dump_json().encode()
         
     def _success_timestamp_data_format(self, target_topic: str, total_messages: int):
@@ -311,8 +315,8 @@ class AutoDeployer(MasterObserver):
             return
         
         if data.deploy_configs:
-            self._topic_deployment_configs[data.source_topic] = data.deploy_configs
-            self._can_deploy_topic[data.source_topic] = TopicDeployDelay(
+            self._topic_deployment_configs[data.deploy_configs.topic_id] = data.deploy_configs
+            self._can_deploy_topic[data.deploy_configs.topic_id] = TopicDeployDelay(
                 can_be_deployed=True,
                 deployed_timestamp=get_timestamp()
             )
@@ -324,7 +328,7 @@ class AutoDeployer(MasterObserver):
         try:
             
             if target_topic not in self._can_deploy_topic:
-                print(f"Topic {target_topic} does not exist, might be not sending heartbeat during initial start")
+                print(f"Topic {target_topic} does not exist, might be not sending heartbeat during initial start or does not have deployment configs")
                 return False
 
             async with self._can_deploy_topic[target_topic].lock:

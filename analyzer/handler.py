@@ -4,6 +4,7 @@ import socket
 from collections.abc import Callable
 from analyzer import DisasterAnalyzer
 from fogverse.general import ParallelRunnable
+from master.contract import CloudDeployConfigs, TopicDeploymentConfig
 from master.master import ConsumerAutoScaler, ProducerObserver
 from .contract import DisasterAnalyzerResponse
 from crawler.contract import CrawlerResponse
@@ -22,7 +23,8 @@ class AnalyzerProducer(Consumer, Producer):
                  consumer_group_id: str,
                  classifier_model: DisasterAnalyzer,
                  consumer_auto_scaler: Optional[ConsumerAutoScaler],
-                 producer_observer: ProducerObserver
+                 producer_observer: ProducerObserver,
+                 topic_deployment_config: TopicDeploymentConfig
                 ):
 
         self.consumer_topic =  consumer_topic
@@ -37,6 +39,7 @@ class AnalyzerProducer(Consumer, Producer):
         Producer.__init__(self)
         Consumer.__init__(self)
 
+        self._topic_deployment_config = topic_deployment_config
         self._consumer_auto_scaler = consumer_auto_scaler
         self._observer = producer_observer
         self._closed = False
@@ -64,7 +67,8 @@ class AnalyzerProducer(Consumer, Producer):
         await self._observer.send_input_output_ratio_pair(
             source_topic=self.consumer_topic,
             target_topic=self.producer_topic,
-            send = lambda x, y: self.producer.send(topic=x, value=y)
+            send = lambda x, y: self.producer.send(topic=x, value=y),
+            topic_configs=self._topic_deployment_config
         )
 
 

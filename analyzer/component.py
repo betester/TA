@@ -3,6 +3,7 @@ from analyzer.processor import AnalyzerProcessor
 from fogverse.consumer_producer import ConfluentConsumer, ConfluentProducer
 from fogverse.general import ParallelRunnable
 from fogverse.util import get_config
+from master.contract import CloudDeployConfigs, TopicDeploymentConfig
 from master.master import ConsumerAutoScaler, ProducerObserver
 from .analyzer import DisasterAnalyzerImpl
 from .handler import AnalyzerProducer, ParallelAnalyzerJobService
@@ -19,12 +20,27 @@ class AnalyzerComponent:
         self._disaster_classifier_model_source = ("is_disaster", str(get_config("DISASTER_CLASSIFIER_MODEL_SOURCE", self, "./mocking_bird")))
         self._keyword_classifier_model_source = ("keyword", str(get_config("KEYWORD_CLASSIFIER_MODEL_SOURCE", self, "./jay_bird")))
 
+        # cloud configs 
+        self._zone = str(get_config("CLOUD_ZONE", self, "ap-southeast-1"))
+        # set the env from the above
+        self._env  = {}
+
+
     def disaster_analyzer(self, consumer_auto_scaler: Optional[ConsumerAutoScaler], producer_observer: ProducerObserver):
         
         disaster_analyzers = DisasterAnalyzerImpl(
             self._disaster_classifier_model_source,
             self._keyword_classifier_model_source
         )
+        
+        topic_deployment_config = TopicDeploymentConfig(
+                topic_id=self._consumer_topic,
+                service_name="analyzer",
+                cloud_deploy_configs=CloudDeployConfigs(
+                    zone=self._zone,
+                    env=self._env
+                )
+            )
 
         analyzer_producer = AnalyzerProducer(
             producer_topic=self._producer_topic,
@@ -34,7 +50,8 @@ class AnalyzerComponent:
             classifier_model=disaster_analyzers,
             consumer_group_id=self._consumer_group_id,
             consumer_auto_scaler=consumer_auto_scaler,
-            producer_observer=producer_observer
+            producer_observer=producer_observer,
+            topic_deployment_config=topic_deployment_config
         )
 
         return analyzer_producer
