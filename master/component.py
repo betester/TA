@@ -3,8 +3,9 @@ import json
 
 from fogverse.util import get_config
 from master.event_handler import Master
-from master.master import AutoDeployer, ConsumerAutoScaler, ProducerObserver
+from master.master import AutoDeployer, ConsumerAutoScaler, ProducerObserver, topic_is_outlier
 from confluent_kafka.admin import AdminClient
+from functools import partial
 
 from master.worker import InputOutputRatioWorker, StatisticWorker
 
@@ -41,11 +42,9 @@ class MasterComponent:
         observer_topic = str(get_config("OBSERVER_TOPIC", self, "observer"))
         return ProducerObserver(observer_topic)
 
+    async def mock_deploy(self, machine_id: str):
+        print(f"Deploying {machine_id}")
 
-    async def mock_deploy(self, string: str) -> Boolean:
-        return True
-
-    def mock_should_be_deployed(self, string: str, integer: int) -> Boolean:
         return True
     
     def master_event_handler(self):
@@ -53,21 +52,26 @@ class MasterComponent:
         consumer_servers = str(get_config("OBSERVER_CONSUMER_SERVERS", self, "localhost:9092"))
         consumer_group_id = str(get_config("OBSERVER_CONSUMER_GROUP_ID", self, "observer"))
         deploy_delay = int(str(get_config("DEPLOY_DELAY", self, 60)))
+        z_value = int(str(get_config("Z_VALUE", self, 3)))
         machine_input = str(get_config("MACHINE_IDS", self, json.dumps(self.local_machine_ids)))
         topic_machine_input = str(get_config("TOPIC_MACHINE_CONSUMER", self, json.dumps(self.local_topic_machine_consumer)))
 
         machine_ids: set[str] = set(json.loads(machine_input))
         topic_machine_consumer : dict[str, set[str]] = { topic_id: set(machine_ids) for topic_id, machine_ids in json.loads(topic_machine_input).items()}
 
+        statistic_worker = StatisticWorker(maximum_seconds=300)
+
+        outlier_detector = partial(topic_is_outlier, statistic_worker, z_value)
+
         auto_deployer = AutoDeployer(
             deploy_command=self.mock_deploy,
-            should_be_deployed=self.mock_should_be_deployed,
+            should_be_deployed=outlier_detector,
             deploy_delay=deploy_delay,
             machine_ids=machine_ids,
             topic_machine_consumer=topic_machine_consumer
         )
 
-        statistic_worker = StatisticWorker(maximum_seconds=300)
+
         input_output_worker = InputOutputRatioWorker(
             refresh_rate_second=60,
             input_output_ratio_threshold=0.7,

@@ -2,9 +2,8 @@
 import time
 
 from collections.abc import Callable, Coroutine
-from typing import Any, Optional
+from typing import Any
 from aiokafka.client import asyncio
-from aiokafka.conn import functools
 from aiokafka.protocol.admin import Boolean
 from confluent_kafka.admin import (
     AdminClient,
@@ -18,7 +17,7 @@ from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
 
 from confluent_kafka import Consumer, KafkaException, TopicCollection
 from fogverse.util import get_timestamp
-from master.contract import InputOutputThroughputPair, MachineConditionData, MasterObserver
+from master.contract import InputOutputThroughputPair, MachineConditionData, MasterObserver, TopicStatistic
 
 class ConsumerAutoScaler:
 
@@ -278,8 +277,8 @@ class AutoDeployer:
 
     def __init__(
             self,
-            deploy_command: Callable[[str], Coroutine[Any, Any, Boolean]],
-            should_be_deployed : Callable[[str, int] ,Boolean],
+            deploy_command: Callable[[str], Coroutine[Any, Any, bool]],
+            should_be_deployed : Callable[[str, int] ,bool],
             deploy_delay: int,
             machine_ids: set[str],
             topic_machine_consumer: dict[str, set[str]]
@@ -335,3 +334,10 @@ class AutoDeployer:
         except Exception as e:
             print(e)
             return False
+
+def topic_is_outlier(topic_statistic: TopicStatistic, z_threshold: int, topic_id: str, topic_throughput: int) -> bool:
+    std = topic_statistic.get_topic_standard_deviation(topic_id)
+    mean = topic_statistic.get_topic_mean(topic_id)
+    z_score = (topic_throughput - mean)/std
+    
+    return abs(z_score) > z_threshold

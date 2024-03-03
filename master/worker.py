@@ -2,12 +2,11 @@
 from collections.abc import Callable, Coroutine
 from typing import Any
 from aiokafka.client import asyncio
-import logging
 
 from aiokafka.conn import functools
-from master.contract import InputOutputThroughputPair, MachineConditionData, MasterObserver
+from master.contract import InputOutputThroughputPair, MachineConditionData, MasterObserver, TopicStatistic
 
-class StatisticWorker(MasterObserver):
+class StatisticWorker(MasterObserver, TopicStatistic):
 
     def __init__(self, maximum_seconds: int, refresh_rate: float = 1):
         '''
