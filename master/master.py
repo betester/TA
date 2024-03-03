@@ -286,7 +286,7 @@ class AutoDeployer:
         self._deploy_command = deploy_command
         self._should_be_deployed = should_be_deployed
         self._deploy_delay = deploy_delay
-        self._machine_total_deployment: dict[str, int] = {machine_id : 0 for machine_id in machine_ids}
+        self._machine_already_deployed: dict[str, bool] = {machine_id : False for machine_id in machine_ids}
         self._topic_machine_consumer: dict[str, set[str]] = topic_machine_consumer
         self.can_deploy = True
         self._deploy_timestamp = -1
@@ -298,35 +298,29 @@ class AutoDeployer:
 
     def get_machine_id(self, topic_id) -> str:
         machine_ids = self._topic_machine_consumer[topic_id]
-        machine_current_min_total_deploy_id = None
-        min_total_deploy = -1
 
         for machine_id in machine_ids:
-            if self._machine_total_deployment[machine_id] < min_total_deploy:
-                min_total_deploy = self._machine_total_deployment[machine_id]
-                machine_current_min_total_deploy_id = machine_id
+            if not self._machine_already_deployed[machine_id]:
+               return machine_id
 
-        if not machine_current_min_total_deploy_id:
-            raise Exception(f"No machine for topic {topic_id}")
-
-        return machine_current_min_total_deploy_id
+        raise Exception(f"All machine for topic {topic_id} already deployed, no more machine can be deployed")
     
-    async def deploy(self, topic_id: str, total_calls: int) -> bool:
+    async def deploy(self, source_topic: str, source_total_calls: int, target_topic: str) -> bool:
         try:
             if not self.can_deploy:
                 time_remaining = get_timestamp() - self.deploy_time
                 print(f"Cannot be deployed yet, time remaining: {time_remaining}")
                 return False
 
-            if self._should_be_deployed(topic_id, total_calls):
-                machine_id = self.get_machine_id(topic_id)
+            if self._should_be_deployed(source_topic, source_total_calls):
+                machine_id = self.get_machine_id(target_topic)
                 deployed = await self._deploy_command(machine_id)
-                self.can_deploy = False
-                self.deploy_time = get_timestamp()
-                asyncio.create_task(self.delay_deploy())
 
                 if deployed:
-                    self._machine_total_deployment[machine_id] += 1
+                    self._machine_already_deployed[machine_id] = True
+                    self.can_deploy = False
+                    self.deploy_time = get_timestamp()
+                    asyncio.create_task(self.delay_deploy())
                     return True
             
             print("Machine should not be deployed, could be a spike")
@@ -336,8 +330,11 @@ class AutoDeployer:
             return False
 
 def topic_is_outlier(topic_statistic: TopicStatistic, z_threshold: int, topic_id: str, topic_throughput: int) -> bool:
+    print(f"Checking if topic {topic_id} is a spike or not")
     std = topic_statistic.get_topic_standard_deviation(topic_id)
     mean = topic_statistic.get_topic_mean(topic_id)
     z_score = (topic_throughput - mean)/std
-    
+
+    print(f"Topic {topic_id} statistics:\nMean: {mean}\nStandard Deviation: {std}\nZ-Score:{z_score}")
+    #TODO: put explanation probably whether it's most likely can be deployed or not
     return abs(z_score) > z_threshold

@@ -90,7 +90,7 @@ class InputOutputRatioWorker(MasterObserver):
             self,
             refresh_rate_second: float,
             input_output_ratio_threshold: float,
-            below_threshold_callback: Callable[[str, int], Coroutine[Any, Any, bool]]
+            below_threshold_callback: Callable[[str, int, str], Coroutine[Any, Any, bool]]
         ):
         '''
         Worker that helps for counting input output ratio of topic
@@ -135,8 +135,10 @@ class InputOutputRatioWorker(MasterObserver):
                     if throughput_ratio == target_topic_throughput:
                         print(f"Source topic {source_topic} throughput is {source_topic_throughput}, the machine might be dead")
 
+                    print(f"Ratio between topic {target_topic} and {source_topic} is: {throughput_ratio}")
                     if throughput_ratio < self._input_output_ratio_threshold:
-                        await self._below_threshold_callback(target_topic, target_topic_throughput)
+                        print(f"{throughput_ratio} is less than threshold: {throughput_ratio}")
+                        await self._below_threshold_callback(source_topic, source_topic_throughput, target_topic)
 
             for topic, throughput in self._topics_current_count.items():
                 print(f"Topic {topic} total message in {self._topics_current_count} seconds: {throughput}")
