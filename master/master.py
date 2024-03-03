@@ -1,10 +1,8 @@
-
 import time
 
 from collections.abc import Callable, Coroutine
-from typing import Any
+from typing import Any, Tuple
 from aiokafka.client import asyncio
-from aiokafka.protocol.admin import Boolean
 from confluent_kafka.admin import (
     AdminClient,
     ConsumerGroupDescription,
@@ -17,7 +15,7 @@ from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
 
 from confluent_kafka import Consumer, KafkaException, TopicCollection
 from fogverse.util import get_timestamp
-from master.contract import InputOutputThroughputPair, MachineConditionData, MasterObserver, TopicStatistic
+from master.contract import InputOutputThroughputPair, MachineConditionData, MasterObserver, TopicDeploymentConfig, TopicStatistic
 
 class ConsumerAutoScaler:
 
@@ -273,37 +271,38 @@ class ProducerObserver:
             timestamp=int(get_timestamp().timestamp())
         ).model_dump_json().encode()
 
-class AutoDeployer:
+class AutoDeployer(MasterObserver):
 
     def __init__(
             self,
-            deploy_command: Callable[[str], Coroutine[Any, Any, bool]],
+            deploy_machine: Callable[[TopicDeploymentConfig], Coroutine[Any, Any, Tuple[str, Callable[[str], Any]]]],
             should_be_deployed : Callable[[str, int] ,bool],
-            deploy_delay: int,
-            machine_ids: set[str],
-            topic_machine_consumer: dict[str, set[str]]
+            deploy_delay: int
         ):
-        self._deploy_command = deploy_command
+        self._deploy_command = deploy_machine
         self._should_be_deployed = should_be_deployed
         self._deploy_delay = deploy_delay
-        self._machine_already_deployed: dict[str, bool] = {machine_id : False for machine_id in machine_ids}
-        self._topic_machine_consumer: dict[str, set[str]] = topic_machine_consumer
         self.can_deploy = True
         self._deploy_timestamp = -1
 
+
+        self._topic_deployment_configs: dict[str, TopicDeploymentConfig] = {}
+        self._machine_ids: list[Tuple[str, Callable]] = []
 
     async def delay_deploy(self):
         await asyncio.sleep(self._deploy_delay)
         self.can_deploy = True
 
-    def get_machine_id(self, topic_id) -> str:
-        machine_ids = self._topic_machine_consumer[topic_id]
 
-        for machine_id in machine_ids:
-            if not self._machine_already_deployed[machine_id]:
-               return machine_id
+    def on_receive(self, data: InputOutputThroughputPair | MachineConditionData):
+        if isinstance(data, MachineConditionData):
+            return
+        
+        if data.deploy_configs:
+            self._topic_deployment_configs[data.source_topic] = data.deploy_configs
 
-        raise Exception(f"All machine for topic {topic_id} already deployed, no more machine can be deployed")
+    async def start(self):
+        pass
     
     async def deploy(self, source_topic: str, source_total_calls: int, target_topic: str) -> bool:
         try:
@@ -313,21 +312,24 @@ class AutoDeployer:
                 return False
 
             if self._should_be_deployed(source_topic, source_total_calls):
-                machine_id = self.get_machine_id(target_topic)
-                deployed = await self._deploy_command(machine_id)
+                deployed_machine_id, turn_off_machine = await self._deploy_command(self._topic_deployment_configs[target_topic])
+                self._machine_ids.append((deployed_machine_id, turn_off_machine))
 
-                if deployed:
-                    self._machine_already_deployed[machine_id] = True
-                    self.can_deploy = False
-                    self.deploy_time = get_timestamp()
-                    asyncio.create_task(self.delay_deploy())
-                    return True
+                self.can_deploy = False
+                self.deploy_time = get_timestamp()
+                asyncio.create_task(self.delay_deploy())
+                return True
             
             print("Machine should not be deployed, could be a spike")
             return False
         except Exception as e:
             print(e)
             return False
+    
+    async def stop(self):
+        for machine_id, turn_off_machine in self._machine_ids:
+            await turn_off_machine(machine_id)
+
 
 def topic_is_outlier(topic_statistic: TopicStatistic, z_threshold: int, topic_id: str, topic_throughput: int) -> bool:
     print(f"Checking if topic {topic_id} is a spike or not")
