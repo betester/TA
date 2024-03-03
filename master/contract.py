@@ -27,7 +27,7 @@ class CloudProvider(StrEnum):
     AWS = "AWS"
 
 class CloudDeployConfigs(BaseModel):
-    provider: CloudProvider = CloudProvider.GOOGLE_CLOUD
+    provider: CloudProvider = CloudProvider.LOCAL
     zone: str
     env: dict[str, str]
 

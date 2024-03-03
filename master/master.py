@@ -1,7 +1,7 @@
 import time
 
 from collections.abc import Callable, Coroutine
-from typing import Any, Tuple
+from typing import Any
 from aiokafka.client import asyncio
 from confluent_kafka.admin import (
     AdminClient,
