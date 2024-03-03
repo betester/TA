@@ -7,7 +7,7 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Any, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class Master(ABC):
@@ -43,9 +43,11 @@ class InputOutputThroughputPair(BaseModel):
     deploy_configs: TopicDeploymentConfig 
 
 class TopicDeployDelay(BaseModel):
+    model_config = ConfigDict(ignored_types=(asyncio.Lock, ))
     can_be_deployed: bool
     deployed_timestamp: datetime
-    lock: asyncio.Lock = Lock()
+    _lock: asyncio.Lock = Lock()
+
 
 class DeployResult(BaseModel):
     machine_id: str

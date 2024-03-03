@@ -34,7 +34,7 @@ class AnalyzerComponent:
         )
         
         topic_deployment_config = TopicDeploymentConfig(
-                topic_id=self._consumer_topic,
+                topic_id=self._producer_topic,
                 service_name="analyzer",
                 cloud_deploy_configs=CloudDeployConfigs(
                     zone=self._zone,

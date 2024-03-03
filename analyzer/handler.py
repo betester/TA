@@ -33,7 +33,7 @@ class AnalyzerProducer(Consumer, Producer):
         self.producer_servers = producer_servers
         self._classifier_model = classifier_model
         self.group_id = consumer_group_id
-        self.__log = get_logger(name=self.__class__.__name__)
+        self._log = get_logger(name=self.__class__.__name__)
         self.auto_decode = False
 
         Producer.__init__(self)
@@ -92,11 +92,11 @@ class AnalyzerProducer(Consumer, Producer):
                 )
 
         except Exception as e:
-            self.__log.error(e)
+            self._log.error(e)
 
     async def send(self, data, topic=None, key=None, headers=None, callback=None):
         result = await super().send(data, topic, key, headers, callback)
-        self._observer.send_total_successful_messages(
+        await self._observer.send_total_successful_messages(
             target_topic=self.producer_topic,
             send = lambda x, y: self.producer.send(topic=x, value=y),
             total_messages = 1

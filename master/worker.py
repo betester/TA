@@ -4,6 +4,7 @@ from typing import Any
 from aiokafka.client import asyncio
 
 from aiokafka.conn import functools
+from fogverse.fogverse_logging import get_logger
 from master.contract import InputOutputThroughputPair, MachineConditionData, MasterObserver, TopicStatistic
 
 class StatisticWorker(MasterObserver, TopicStatistic):
@@ -22,6 +23,7 @@ class StatisticWorker(MasterObserver, TopicStatistic):
         self._refresh_rate = refresh_rate   
         self._topics_current_count: dict[str, int] = {} 
         self._topics_observed_counts: dict[str, list[int]] = {}
+        self._logger = get_logger(name=self.__class__.__name__)
 
         self._stop = False
 
@@ -29,6 +31,7 @@ class StatisticWorker(MasterObserver, TopicStatistic):
     def on_receive(self, data: InputOutputThroughputPair | MachineConditionData):
         if isinstance(data, InputOutputThroughputPair):
             return
+    
         topic_current_count = self._topics_current_count.get(data.target_topic, 0)
         topic_current_count += data.total_messages
         self._topics_current_count[data.target_topic] = topic_current_count
@@ -44,10 +47,10 @@ class StatisticWorker(MasterObserver, TopicStatistic):
 
 
     async def start(self):
-        print("Starting statistic worker")
+        self._logger.info("Starting statistic worker")
         while not self._stop:
             await asyncio.sleep(self._refresh_rate)
-            
+
             for topic, current_counts in self._topics_current_count.items():
                 self._add_observed_topic_counts(topic, current_counts)
                 self._topics_current_count[topic] = 0 
@@ -58,7 +61,7 @@ class StatisticWorker(MasterObserver, TopicStatistic):
             total_observed_counts = sum(topic_observed_count)
             return total_observed_counts/len(topic_observed_count)
         except Exception as e:
-            print(e)
+            self._logger.error(e)
             return 0
 
     def get_topic_standard_deviation(self, topic: str) -> float:
@@ -70,7 +73,8 @@ class StatisticWorker(MasterObserver, TopicStatistic):
 
             total_diff_squared_observed_counts = functools.reduce(
                 lambda cumulative_sum, observed_count: (observed_count - avg_observed_counts)**2 + cumulative_sum,
-                topic_observed_count
+                topic_observed_count,
+                0
             )
 
             topic_variance = total_diff_squared_observed_counts/observed_counts_size
@@ -78,7 +82,7 @@ class StatisticWorker(MasterObserver, TopicStatistic):
             return topic_variance**(1/2)
 
         except Exception as e:
-            print(e)
+            self._logger.error(e)
             return 0
     
     async def stop(self):
@@ -90,7 +94,7 @@ class InputOutputRatioWorker(MasterObserver):
             self,
             refresh_rate_second: float,
             input_output_ratio_threshold: float,
-            below_threshold_callback: Callable[[str, int, str], Coroutine[Any, Any, bool]]
+            below_threshold_callback: Callable[[str, float, str], Coroutine[Any, Any, bool]]
         ):
         '''
         Worker that helps for counting input output ratio of topic
@@ -108,6 +112,7 @@ class InputOutputRatioWorker(MasterObserver):
 
         self._topics_current_count: dict[str, int] = {} 
         self._topics_throughput_pair: dict[str, list[str]] = {}
+        self._logger = get_logger(name=self.__class__.__name__)
 
         self._stop = False
         
@@ -123,7 +128,7 @@ class InputOutputRatioWorker(MasterObserver):
             self._topics_current_count[data.target_topic] = topic_current_count
 
     async def start(self):
-        print("Starting input output ratio worker")
+        self._logger.info("Starting input output ratio worker")
         while not self._stop:
             await asyncio.sleep(self._refresh_rate_second)
             for source_topic, target_topics in self._topics_throughput_pair.items():
@@ -133,15 +138,15 @@ class InputOutputRatioWorker(MasterObserver):
                     throughput_ratio = target_topic_throughput/max(source_topic_throughput, 1)
 
                     if throughput_ratio == target_topic_throughput:
-                        print(f"Source topic {source_topic} throughput is {source_topic_throughput}, the machine might be dead")
+                        self._logger.info(f"Source topic {source_topic} throughput is {source_topic_throughput}, the machine might be dead")
 
-                    print(f"Ratio between topic {target_topic} and {source_topic} is: {throughput_ratio}")
+                    self._logger.info(f"Ratio between topic {target_topic} and {source_topic} is: {throughput_ratio}")
                     if throughput_ratio < self._input_output_ratio_threshold:
-                        print(f"{throughput_ratio} is less than threshold: {throughput_ratio}")
-                        await self._below_threshold_callback(source_topic, source_topic_throughput, target_topic)
+                        self._logger.info(f"{throughput_ratio} is less than threshold: {self._input_output_ratio_threshold}")
+                        await self._below_threshold_callback(source_topic, source_topic_throughput/self._refresh_rate_second, target_topic)
 
             for topic, throughput in self._topics_current_count.items():
-                print(f"Topic {topic} total message in {self._topics_current_count} seconds: {throughput}")
+                self._logger.info(f"Topic {topic} total message in {self._refresh_rate_second} seconds: {throughput}")
                 self._topics_current_count[topic] = 0
             
     async def stop(self):
