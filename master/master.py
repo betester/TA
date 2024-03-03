@@ -356,13 +356,17 @@ class AutoDeployer(MasterObserver):
         for machine_id, turn_off_machine in self._machine_ids:
             await turn_off_machine(machine_id)
 
+class TopicSpikeChecker:
 
-def topic_is_outlier(topic_statistic: TopicStatistic, z_threshold: int, topic_id: str, topic_throughput: int) -> bool:
-    print(f"Checking if topic {topic_id} is a spike or not")
-    std = topic_statistic.get_topic_standard_deviation(topic_id)
-    mean = topic_statistic.get_topic_mean(topic_id)
-    z_score = (topic_throughput - mean)/std
+    def __init__(self, topic_statistic: TopicStatistic):
+        self._topic_statistic = topic_statistic
 
-    print(f"Topic {topic_id} statistics:\nMean: {mean}\nStandard Deviation: {std}\nZ-Score:{z_score}")
-    #TODO: put explanation probably whether it's most likely can be deployed or not
-    return z_score > z_threshold
+    def check_spike_by_z_value(self, z_threshold: int, topic_id: str, topic_throughput: int) -> bool:
+        print(f"Checking if topic {topic_id} is a spike or not")
+        std = self._topic_statistic.get_topic_standard_deviation(topic_id)
+        mean = self._topic_statistic.get_topic_mean(topic_id)
+        z_score = (topic_throughput - mean)/std
+
+        print(f"Topic {topic_id} statistics:\nMean: {mean}\nStandard Deviation: {std}\nZ-Score:{z_score}")
+        #TODO: put explanation probably whether it's most likely can be deployed or not
+        return z_score > z_threshold

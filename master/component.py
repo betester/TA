@@ -4,7 +4,7 @@ from typing import Tuple
 from fogverse.util import get_config
 from master.contract import TopicDeploymentConfig
 from master.event_handler import Master
-from master.master import AutoDeployer, ConsumerAutoScaler, ProducerObserver, topic_is_outlier
+from master.master import AutoDeployer, ConsumerAutoScaler, ProducerObserver, TopicSpikeChecker
 from confluent_kafka.admin import AdminClient
 from functools import partial
 
@@ -55,15 +55,13 @@ class MasterComponent:
         z_value = int(str(get_config("Z_VALUE", self, 3)))
 
         statistic_worker = StatisticWorker(maximum_seconds=300)
-
-        outlier_detector = partial(topic_is_outlier, statistic_worker, z_value)
+        topic_spike_checker = TopicSpikeChecker(statistic_worker)
 
         auto_deployer = AutoDeployer(
             deploy_machine=self.mock_deploy,
-            should_be_deployed=outlier_detector,
+            should_be_deployed=partial(topic_spike_checker.check_spike_by_z_value, z_value),
             deploy_delay=deploy_delay
         )
-
 
         input_output_worker = InputOutputRatioWorker(
             refresh_rate_second=60,
