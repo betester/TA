@@ -12,7 +12,7 @@ from confluent_kafka.admin import (
     NewTopic
 )
 from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
-
+from asyncio.subprocess import PIPE, STDOUT 
 from confluent_kafka import Consumer, KafkaException, TopicCollection
 from fogverse.fogverse_logging import get_logger
 from fogverse.util import get_timestamp
@@ -306,16 +306,22 @@ class DeployScripts:
         self._deploy_functions[cloud_provider] = deploy_function
 
     async def _local_deployment(self, configs: TopicDeploymentConfig) -> DeployResult:
-        
-        async def mock_shutdown(machine_id: str):
-            self._logger.info(machine_id)
-            return True
-
-        self._logger.info("Deploying locally")
-        return DeployResult(
-            machine_id=configs.topic_id,
-            shut_down_machine=mock_shutdown
+        # TODO: inject envs 
+        cmd = f'python -m {configs.service_name}'
+        self._logger.info(f"Running script: {cmd}")
+        process = await asyncio.create_subprocess_shell(
+            cmd,
+            stdin = PIPE,
+            stdout = PIPE, 
+            stderr = STDOUT
         )
+
+        if process.returncode == 0:
+            self._logger.info("Command executed successfully")
+            return process.pid, lambda pid : process.kill()
+        
+        raise Exception("Process cannot be created")
+
 
     async def _gooogle_deployment(self, configs: TopicDeploymentConfig) -> DeployResult:
         pass
