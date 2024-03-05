@@ -46,7 +46,6 @@ class ConsumerAutoScaler:
     def _group_id_total_consumer(self, group_id: str) -> int:
         group_future_description = self._kafka_admin.describe_consumer_groups([group_id])[group_id]
         group_description: ConsumerGroupDescription = group_future_description.result()
-        self._logger.info(group_description.members)
         return len(group_description.members)
     
     def _topic_id_total_partition(self, topic_id: str) -> int:
@@ -129,12 +128,15 @@ class ConsumerAutoScaler:
                 raise Exception("Topic cannot be created")
 
         self._logger.info(f"Subscribing to topic {topic_id}")
+
         consumer.subscribe(
             topics=[topic_id], 
             on_assign = self.on_consumer_assigned
         )
 
-        while not self.consumer_is_assigned:
+        total_retry = 0
+
+        while not self.consumer_is_assigned and total_retry <= retry_attempt * 10:
             try:
                 group_id_total_consumer = self._group_id_total_consumer(group_id) 
                 topic_id_total_partition = self._topic_id_total_partition(topic_id)
@@ -148,8 +150,14 @@ class ConsumerAutoScaler:
                     self._add_partition_on_topic(topic_id, group_id_total_consumer)
 
                 consumer.poll(self._sleep_time)
+                time.sleep(self._sleep_time)
             except Exception as e:
                 self._logger.info(e)
+
+            total_retry += 1
+
+        if total_retry > retry_attempt:
+            raise Exception(f"Fail connecting to topic {topic_id} consider changing your topic")
 
     def on_consumer_assigned(self, consumer, partitions):
 
