@@ -177,7 +177,6 @@ class ConfluentProducer:
         try:
             message_batch: list[Message] = []
             while not stop_event.is_set():
-                self.log.info(f"Thread {thread_id} receives the message")
                 message: Message = queue.get()
                 
                 if message is None:
