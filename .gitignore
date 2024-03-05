@@ -2,4 +2,5 @@ env
 *pycache*
 *joblib*
 *-logs*
+*.log*
 *.bin
