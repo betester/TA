@@ -1,3 +1,5 @@
+from asyncio import StreamReader, Task
+import os
 import time
 
 from collections.abc import Callable, Coroutine
@@ -12,7 +14,7 @@ from confluent_kafka.admin import (
     NewTopic
 )
 from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
-from asyncio.subprocess import PIPE, STDOUT 
+from asyncio.subprocess import PIPE, STDOUT, Process 
 from confluent_kafka import Consumer, KafkaException, TopicCollection
 from fogverse.fogverse_logging import get_logger
 from fogverse.util import get_timestamp
@@ -292,10 +294,11 @@ class ProducerObserver:
 
 class DeployScripts:
 
-    def __init__(self):
+    def __init__(self, log_dir_path: str='logs'):
         self._deploy_functions: dict[CloudProvider, Callable[[TopicDeploymentConfig], Coroutine[Any, Any, DeployResult]]] = {}
         self._deploy_functions[CloudProvider.LOCAL] = self._local_deployment
         self._deploy_functions[CloudProvider.GOOGLE_CLOUD] = self._gooogle_deployment
+        self._log_dir_path = log_dir_path
 
         self._logger = get_logger(name=self.__class__.__name__)
 
@@ -304,9 +307,23 @@ class DeployScripts:
 
     def set_deploy_functions(self, cloud_provider: CloudProvider, deploy_function: Callable[[TopicDeploymentConfig], Coroutine[Any, Any, DeployResult]]):
         self._deploy_functions[cloud_provider] = deploy_function
+    
+    async def write_deployed_service_logs(self, file_name: str, stdout: StreamReader):
+        try:
+            os.makedirs(self._log_dir_path, exist_ok=True)
+            full_file_path = os.path.join(self._log_dir_path, file_name)
+            with open(full_file_path, 'w', encoding='utf-8') as f:
+                async for line in stdout:
+                    f.write(line.decode('utf-8'))
+        except Exception as e:
+            print(f"An error occurred while writing logs: {e}")
 
     async def _local_deployment(self, configs: TopicDeploymentConfig) -> DeployResult:
-        # TODO: inject envs 
+
+        # sets every environment variable passed on the configs
+        for key, val in configs.cloud_deploy_configs.env:
+            os.environ[key] = val
+
         cmd = f'python -m {configs.service_name}'
         self._logger.info(f"Running script: {cmd}")
         process = await asyncio.create_subprocess_shell(
@@ -316,9 +333,17 @@ class DeployScripts:
             stderr = STDOUT
         )
 
-        if process.returncode == 0:
-            self._logger.info("Command executed successfully")
-            return process.pid, lambda pid : process.kill()
+        def kill_process_and_task(process: Process, task: Task):
+            self._logger.info(f"Shutting down {process.pid}")
+            process.kill()
+            task.cancel()
+
+        if process.stdout:
+            log_file_name = f'{configs.service_name}-{process.pid}.log'
+            self._logger.info(f"Writing service {configs.service_name} logs with filename: {log_file_name}")
+            task = asyncio.create_task(self.write_deployed_service_logs(log_file_name, process.stdout)) 
+            self._logger.info(f"Command executed successfully, service {configs.service_name} is deployed")
+            return process.pid, lambda process_pid : kill_process_and_task(process, task)
         
         raise Exception("Process cannot be created")
 
