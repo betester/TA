@@ -1,4 +1,6 @@
 from typing import Optional
+
+from aiokafka.conn import functools
 from analyzer.processor import AnalyzerProcessor
 from fogverse.consumer_producer import ConfluentConsumer, ConfluentProducer
 from fogverse.general import ParallelRunnable
@@ -56,7 +58,7 @@ class AnalyzerComponent:
 
         return analyzer_producer
     
-    def parallel_disaster_analyzer(self, consumer_auto_scaler: ConsumerAutoScaler):
+    def parallel_disaster_analyzer(self, consumer_auto_scaler: ConsumerAutoScaler, producer_observer: ProducerObserver):
 
         disaster_analyzers = DisasterAnalyzerImpl(
             self._disaster_classifier_model_source
@@ -74,11 +76,28 @@ class AnalyzerComponent:
             }
         )
 
+        topic_deployment_config = TopicDeploymentConfig(
+                topic_id=self._producer_topic,
+                service_name="analyzer",
+                cloud_deploy_configs=CloudDeployConfigs(
+                    zone=self._zone,
+                    env=self._env
+                )
+            )
+
+        start_producer_callback = functools.partial(
+            producer_observer.send_input_output_ratio_pair,
+            self._consumer_topic,
+            self._producer_topic,
+            topic_deployment_config
+        )
+
+
         producer = ConfluentProducer(
             topic=self._producer_topic,
             kafka_server=self._producer_servers,
             processor=analyzer_processor,
-            #TODO: inject partial on this part for sending input output throughput ratio as well as deployment configs
+            start_producer_callback=start_producer_callback,
             batch_size=20
         )
 
@@ -89,5 +108,5 @@ class AnalyzerComponent:
             total_producer=5
         )
 
-        return ParallelAnalyzerJobService(runnable)
+        return ParallelAnalyzerJobService(runnable, producer_observer)
 

@@ -14,16 +14,10 @@ async def main():
     producer_observer = master_component.producer_observer()
 
     if mode == "parallel":
-        analyzer_event_handler = analyzer_component.parallel_disaster_analyzer(
-            consumer_auto_scaler
-        )
-        analyzer_event_handler.start(producer_observer.send_total_successful_messages)
+        analyzer_component.parallel_disaster_analyzer(consumer_auto_scaler, producer_observer).start()
 
     elif mode == "serial":
-        await analyzer_component.disaster_analyzer(
-            consumer_auto_scaler,
-            producer_observer
-        ).run()
+        await analyzer_component.disaster_analyzer(consumer_auto_scaler, producer_observer).run()
         
 
 if __name__ == "__main__":

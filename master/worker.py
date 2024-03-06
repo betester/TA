@@ -119,6 +119,7 @@ class InputOutputRatioWorker(MasterObserver):
     
     def on_receive(self, data: InputOutputThroughputPair | MachineConditionData):
         if isinstance(data, InputOutputThroughputPair):
+            self._logger.info(f"Received input output through pair data: {data}")
             target_topics = self._topics_throughput_pair.get(data.source_topic, [])
             target_topics.append(data.target_topic)
             self._topics_throughput_pair[data.source_topic] = target_topics

@@ -67,8 +67,8 @@ class AnalyzerProducer(Consumer, Producer):
         await self._observer.send_input_output_ratio_pair(
             source_topic=self.consumer_topic,
             target_topic=self.producer_topic,
-            send = lambda x, y: self.producer.send(topic=x, value=y),
-            topic_configs=self._topic_deployment_config
+            topic_configs=self._topic_deployment_config,
+            send = lambda x, y: self.producer.send(topic=x, value=y)
         )
 
 
@@ -104,9 +104,10 @@ class AnalyzerProducer(Consumer, Producer):
         return result
 
 class ParallelAnalyzerJobService:
-    def __init__(self, runnable: ParallelRunnable):
+    def __init__(self, runnable: ParallelRunnable, producer_observer: ProducerObserver):
         self.runnable = runnable
+        self.producer_observer = producer_observer
 
-    def start(self, on_producer_complete: Callable[[str, int, Callable[[str, bytes], Any]], None]):
-        self.runnable.run(on_producer_complete)
+    def start(self):
+        self.runnable.run(self.producer_observer.send_total_successful_messages)
 

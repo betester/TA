@@ -50,8 +50,8 @@ class TopicDeployDelay(BaseModel):
 
 
 class DeployResult(BaseModel):
-    machine_id: str
-    shut_down_machine: Callable[[str], Coroutine[Any, Any, bool]] 
+    machine_id: int 
+    shut_down_machine: Callable[[int], Coroutine[Any, Any, bool]] 
 
 
 class MasterObserver(ABC):

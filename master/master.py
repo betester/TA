@@ -246,12 +246,12 @@ class ProducerObserver:
         self._logger = get_logger(name=self.__class__.__name__)
 
 
-    def send_input_output_ratio_pair(self, source_topic: str, target_topic: str, send: Callable[[str, bytes], Any], topic_configs: TopicDeploymentConfig):
+    def send_input_output_ratio_pair(self, source_topic: str, target_topic: str, topic_configs: TopicDeploymentConfig, send: Callable[[str, bytes], Any]):
         '''
         Identify which topic pair should the observer ratio with
         send: a produce function from kafka
         '''
-        self._logger.info("Sending input output ratio")
+        self._logger.info(f"Sending input output ratio to topic {self._producer_topic}")
         if source_topic is not None:
             return send(
                 self._producer_topic,
@@ -330,18 +330,27 @@ class DeployScripts:
             stderr = STDOUT
         )
 
-        def kill_process_and_task(process: Process, task: Task):
+        async def kill_process_and_task(process: Process, task: Task) -> bool:
             self._logger.info(f"Shutting down {process.pid}")
-            process.kill()
-            task.cancel()
+            try:
+                process.kill()
+                task.cancel()
+                return True
+            except Exception as e:
+                self._logger.error(f"Fail shutting down process {process.pid}, please turn off them manually", e)
+                return False
 
+            
         if process.stdout:
             log_file_name = f'{configs.service_name}-{process.pid}.log'
             self._logger.info(f"Writing service {configs.service_name} logs with filename: {log_file_name}")
             task = asyncio.create_task(self.write_deployed_service_logs(log_file_name, process.stdout)) 
             self._logger.info(f"Command executed successfully, service {configs.service_name} is deployed")
-            return process.pid, lambda process_pid : kill_process_and_task(process, task)
-        
+            return DeployResult(
+                machine_id=process.pid,
+                shut_down_machine= lambda process_pid : kill_process_and_task(process, task)
+            ) 
+
         raise Exception("Process cannot be created")
 
 

@@ -166,6 +166,7 @@ class ConfluentProducer:
                  topic: str,
                  kafka_server: str,
                  processor: Processor,
+                 start_producer_callback : Callable[[Callable[[str, bytes], Any]], Any],
                  producer_extra_config: dict={},
                  batch_size: int = 1):
         
@@ -179,10 +180,17 @@ class ConfluentProducer:
         self.queue = queue
 
         self.batch_size = batch_size
+        self._callback_is_called = False
+        self.start_producer_callback = start_producer_callback
 
         self.log = get_logger()
     
     def start_produce(self, queue: queue.Queue, stop_event: Event, on_complete: Callable[[str, int, Callable[[str, bytes], Any]], None], thread_id: int):
+
+        if self.start_producer_callback and not self._callback_is_called:
+            self._callback_is_called = True
+            self.start_producer_callback(lambda x, y: self.producer.produce(topic=x, value=y))
+
         try:
             message_batch: list[Message] = []
             while not stop_event.is_set():
