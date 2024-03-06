@@ -1,40 +1,23 @@
 
-from aiokafka.consumer.fetcher import asyncio
-from confluent_kafka import Message
-from fogverse.base import Processor
-from fogverse.consumer_producer import ConfluentConsumer, ConfluentProducer
-from fogverse.general import ParallelRunnable
+import asyncio
 
-class TestProcessor(Processor):
-    def process(self, message: Message):
-        return b'Hello World'
+from asyncio.subprocess import PIPE, STDOUT 
 
-def main():
-    consumer = ConfluentConsumer(
-        topics=["client"],
-        kafka_server="localhost:9092",
-        consumer_extra_config={
-            'auto.offset.reset': 'latest',
-            'group.id': 'testing_client'
-        },
-        poll_time=0.01
-    )
-    
-    producer = ConfluentProducer(
-        topic="client",
-        kafka_server="localhost:9092",
-        processor=TestProcessor()
+async def main():
+    cmd = 'python -m analyzer'
+    print("running script ")
+    process = await asyncio.create_subprocess_shell(cmd, stdin = PIPE, stdout = PIPE, stderr = STDOUT)
+    print("Done running process")
+    # Open a file to write stdout to
+    if process.stdout:
+        while True:
+            curr_line = await process.stdout.readline()
+            print(str(curr_line))
 
-    runnable = ParallelRunnable(
-        consumer,
-        producer,
-        None,
-        total_producer=5
-    )
-
-    runnable.run()
-
-
+    try:
+        await process.wait()
+    except KeyboardInterrupt:
+        process.kill()
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())

@@ -1,14 +1,16 @@
 
+import socket
+
 from collections.abc import Callable
 from analyzer import DisasterAnalyzer
 from fogverse.general import ParallelRunnable
+from master.contract import CloudDeployConfigs, TopicDeploymentConfig
 from master.master import ConsumerAutoScaler, ProducerObserver
 from .contract import DisasterAnalyzerResponse
 from crawler.contract import CrawlerResponse
 from fogverse import Producer, Consumer
 from fogverse.fogverse_logging import get_logger
 from typing import Any, Optional
-from confluent_kafka import Producer as ConfluentProducer
 
 
 class AnalyzerProducer(Consumer, Producer):
@@ -21,7 +23,8 @@ class AnalyzerProducer(Consumer, Producer):
                  consumer_group_id: str,
                  classifier_model: DisasterAnalyzer,
                  consumer_auto_scaler: Optional[ConsumerAutoScaler],
-                 producer_observer: ProducerObserver
+                 producer_observer: ProducerObserver,
+                 topic_deployment_config: TopicDeploymentConfig
                 ):
 
         self.consumer_topic =  consumer_topic
@@ -30,15 +33,18 @@ class AnalyzerProducer(Consumer, Producer):
         self.producer_servers = producer_servers
         self._classifier_model = classifier_model
         self.group_id = consumer_group_id
-        self.__log = get_logger(name=self.__class__.__name__)
+        self._log = get_logger(name=self.__class__.__name__)
         self.auto_decode = False
 
         Producer.__init__(self)
         Consumer.__init__(self)
 
+        self._topic_deployment_config = topic_deployment_config
         self._consumer_auto_scaler = consumer_auto_scaler
         self._observer = producer_observer
         self._closed = False
+
+        self.client_id = socket.gethostname()
 
 
     def decode(self, data: bytes) -> CrawlerResponse:
@@ -49,7 +55,7 @@ class AnalyzerProducer(Consumer, Producer):
 
     async def _start(self):
         if self._consumer_auto_scaler:
-            await self._consumer_auto_scaler._start(
+            await self._consumer_auto_scaler.async_start(
                 consumer=self.consumer,
                 consumer_group=self.group_id,
                 consumer_topic=self.consumer_topic,
@@ -61,6 +67,7 @@ class AnalyzerProducer(Consumer, Producer):
         await self._observer.send_input_output_ratio_pair(
             source_topic=self.consumer_topic,
             target_topic=self.producer_topic,
+            topic_configs=self._topic_deployment_config,
             send = lambda x, y: self.producer.send(topic=x, value=y)
         )
 
@@ -85,11 +92,11 @@ class AnalyzerProducer(Consumer, Producer):
                 )
 
         except Exception as e:
-            self.__log.error(e)
+            self._log.error(e)
 
     async def send(self, data, topic=None, key=None, headers=None, callback=None):
         result = await super().send(data, topic, key, headers, callback)
-        self._observer.send_total_successful_messages(
+        await self._observer.send_total_successful_messages(
             target_topic=self.producer_topic,
             send = lambda x, y: self.producer.send(topic=x, value=y),
             total_messages = 1
@@ -97,9 +104,10 @@ class AnalyzerProducer(Consumer, Producer):
         return result
 
 class ParallelAnalyzerJobService:
-    def __init__(self, runnable: ParallelRunnable):
+    def __init__(self, runnable: ParallelRunnable, producer_observer: ProducerObserver):
         self.runnable = runnable
+        self.producer_observer = producer_observer
 
-    def start(self, on_producer_complete: Callable[[str, int, Callable[[str, bytes], Any]], None]):
-        self.runnable.run(on_producer_complete)
+    def start(self):
+        self.runnable.run(self.producer_observer.send_total_successful_messages)
 

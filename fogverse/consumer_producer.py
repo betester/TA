@@ -52,7 +52,7 @@ class AIOKafkaConsumer(AbstractConsumer):
         if self._topic_pattern:
             self.consumer.subscribe(pattern=self._topic_pattern)
         await asyncio.sleep(5) # wait until assigned to partition
-        if getattr(self, 'read_last', True):
+        if getattr(self, 'read_last', False):
             await self.consumer.seek_to_end()
 
     async def receive(self):
@@ -126,22 +126,31 @@ class ConfluentConsumer:
         self.consumer = Consumer({
             **consumer_extra_config,
             "bootstrap.servers": kafka_server,
-            'group.id': group_id
+            "group.id": group_id,
+            "client.id": socket.gethostname()
         })
 
         if consumer_auto_scaler is not None:
-            consumer_auto_scaler.start(
+            self.consumed_messages = consumer_auto_scaler.start(
                 self.consumer,
                 topics,
                 group_id
-        )
+            )
         else:
             self.consumer.subscribe([topics])
 
-        self.queue = queue
-        self.log = get_logger()
+        self.log = get_logger(name=self.__class__.__name__)
+
+    def _populate_queue_with_consumed_message(self, queue: queue.Queue):
+        if not self.consumed_messages:
+            return
+
+        for consumed_message in self.consumed_messages:
+            queue.put(consumed_message)
 
     def start_consume(self, queue: queue.Queue, stop_event: Event):
+
+        self._populate_queue_with_consumed_message(queue)
 
         try:
             while not stop_event.is_set():
@@ -157,6 +166,7 @@ class ConfluentProducer:
                  topic: str,
                  kafka_server: str,
                  processor: Processor,
+                 start_producer_callback : Callable[[Callable[[str, bytes], Any]], Any],
                  producer_extra_config: dict={},
                  batch_size: int = 1):
         
@@ -170,14 +180,20 @@ class ConfluentProducer:
         self.queue = queue
 
         self.batch_size = batch_size
+        self._callback_is_called = False
+        self.start_producer_callback = start_producer_callback
 
         self.log = get_logger()
     
     def start_produce(self, queue: queue.Queue, stop_event: Event, on_complete: Callable[[str, int, Callable[[str, bytes], Any]], None], thread_id: int):
+
+        if self.start_producer_callback and not self._callback_is_called:
+            self._callback_is_called = True
+            self.start_producer_callback(lambda x, y: self.producer.produce(topic=x, value=y))
+
         try:
             message_batch: list[Message] = []
             while not stop_event.is_set():
-                self.log.info(f"Thread {thread_id} receives the message")
                 message: Message = queue.get()
                 
                 if message is None:
