@@ -78,6 +78,7 @@ class AnalyzerComponent:
             topic=self._producer_topic,
             kafka_server=self._producer_servers,
             processor=analyzer_processor,
+            #TODO: inject partial on this part for sending input output throughput ratio as well as deployment configs
             batch_size=20
         )
 

@@ -52,7 +52,7 @@ class AIOKafkaConsumer(AbstractConsumer):
         if self._topic_pattern:
             self.consumer.subscribe(pattern=self._topic_pattern)
         await asyncio.sleep(5) # wait until assigned to partition
-        if getattr(self, 'read_last', ):
+        if getattr(self, 'read_last', False):
             await self.consumer.seek_to_end()
 
     async def receive(self):
