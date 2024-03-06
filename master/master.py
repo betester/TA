@@ -3,7 +3,7 @@ import os
 import time
 
 from collections.abc import Callable, Coroutine
-from typing import Any
+from typing import Any, Optional
 from aiokafka.client import asyncio
 from confluent_kafka.admin import (
     AdminClient,
@@ -15,7 +15,7 @@ from confluent_kafka.admin import (
 )
 from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
 from asyncio.subprocess import PIPE, STDOUT, Process 
-from confluent_kafka import Consumer, KafkaException, TopicCollection
+from confluent_kafka import Consumer, KafkaException, Message, TopicCollection
 from fogverse.fogverse_logging import get_logger
 from fogverse.util import get_timestamp
 from master.contract import (
@@ -38,7 +38,7 @@ class ConsumerAutoScaler:
         self._kafka_admin = kafka_admin
         self._sleep_time = sleep_time
         self._initial_total_partition = initial_total_partition
-        self.consumer_is_assigned = False
+        self.consumer_is_assigned_partition = False
 
         self._logger = get_logger(name=self.__class__.__name__)
     
@@ -51,7 +51,6 @@ class ConsumerAutoScaler:
     def _topic_id_total_partition(self, topic_id: str) -> int:
         topic_future_description = self._kafka_admin.describe_topics(TopicCollection([topic_id]))[topic_id]
         topic_description: TopicDescription = topic_future_description.result()
-        self._logger.info(topic_description)
         return len(topic_description.partitions)
     
 
@@ -117,7 +116,7 @@ class ConsumerAutoScaler:
               topic_id: str,
               group_id: str,
               /,
-              retry_attempt: int=3):
+              retry_attempt: int=3) -> Optional[list[Message]]:
 
         self._logger.info("Creating topic if not exist")
         self.topic_id = topic_id
@@ -130,13 +129,23 @@ class ConsumerAutoScaler:
         self._logger.info(f"Subscribing to topic {topic_id}")
 
         consumer.subscribe(
-            topics=[topic_id], 
-            on_assign = self.on_consumer_assigned
+            topics=[topic_id] 
         )
 
-        total_retry = 0
+        self._logger.info("Waiting for consumer to be assigned on a consumer group")
 
-        while not self.consumer_is_assigned and total_retry <= retry_attempt * 10:
+        while True:
+            consumer_member_id = consumer.memberid() 
+            if consumer.memberid():
+                self._logger.info(f"Consumer assigned to consumer group with id {consumer_member_id}")
+                break
+
+            self._logger.info("Consumer is still not assigned on the consumer group, retrying...")
+            time.sleep(self._sleep_time)
+
+        consumed_message = []
+
+        while not self.consumer_is_assigned_partition:
             try:
                 group_id_total_consumer = self._group_id_total_consumer(group_id) 
                 topic_id_total_partition = self._topic_id_total_partition(topic_id)
@@ -149,41 +158,21 @@ class ConsumerAutoScaler:
                     self._logger.info(f"Adding {group_id_total_consumer} partition to topic {topic_id}")
                     self._add_partition_on_topic(topic_id, group_id_total_consumer)
 
-                consumer.poll(self._sleep_time)
-                time.sleep(self._sleep_time)
+                message = consumer.poll(self._sleep_time)
+
+                if message:
+                    consumed_message.append(message)
+
+                consumer_partition_assignment = consumer.assignment()
+                self.consumer_is_assigned_partition = len(consumer_partition_assignment) != 0
+
+                if self.consumer_is_assigned_partition:
+                    self._logger.info(f"Consumer is assigned to {len(consumer_partition_assignment)} partitions, consuming")
+                    return consumed_message
+
+                self._logger.info("Fail connecting, retrying...")
             except Exception as e:
                 self._logger.info(e)
-
-            total_retry += 1
-
-        if total_retry > retry_attempt:
-            raise Exception(f"Fail connecting to topic {topic_id} consider changing your topic")
-
-    def on_consumer_assigned(self, consumer, partitions):
-
-        try:
-            if self.consumer_is_assigned:
-                return
-
-            committed_messages = consumer.committed(partitions)
-            if len(committed_messages) == 0:
-                self._logger.info("Failed to be assigned, retrying")
-                consumer.unsubscribe()
-                consumer.subscribe(
-                    topics=[self.topic_id], 
-                    on_assign = self.on_consumer_assigned
-                )
-                return
-            least_offset = min(map(lambda x: x.offset, committed_messages))
-
-            if  least_offset != ConsumerAutoScaler.OFFSET_OUT_OF_RANGE:
-                least_offset_index = committed_messages.index(least_offset)
-                consumer.seek(committed_messages[least_offset_index])
-
-            self._logger.info(f"Consumer is assigned, consuming")
-            self.consumer_is_assigned = True
-        except Exception as e:
-            self._logger.info(e)
 
 
     def on_revoke(self, consumer, partitions):

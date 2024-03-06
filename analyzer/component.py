@@ -70,7 +70,7 @@ class AnalyzerComponent:
             group_id=self._consumer_group_id,
             consumer_auto_scaler=consumer_auto_scaler,
             consumer_extra_config={
-                'auto.offset.reset': 'latest'
+                "auto.offset.reset": "latest"
             }
         )
 

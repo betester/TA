@@ -52,7 +52,7 @@ class AIOKafkaConsumer(AbstractConsumer):
         if self._topic_pattern:
             self.consumer.subscribe(pattern=self._topic_pattern)
         await asyncio.sleep(5) # wait until assigned to partition
-        if getattr(self, 'read_last', True):
+        if getattr(self, 'read_last', ):
             await self.consumer.seek_to_end()
 
     async def receive(self):
@@ -126,22 +126,31 @@ class ConfluentConsumer:
         self.consumer = Consumer({
             **consumer_extra_config,
             "bootstrap.servers": kafka_server,
-            'group.id': group_id
+            "group.id": group_id,
+            "client.id": socket.gethostname()
         })
 
         if consumer_auto_scaler is not None:
-            consumer_auto_scaler.start(
+            self.consumed_messages = consumer_auto_scaler.start(
                 self.consumer,
                 topics,
                 group_id
-        )
+            )
         else:
             self.consumer.subscribe([topics])
 
-        self.queue = queue
-        self.log = get_logger()
+        self.log = get_logger(name=self.__class__.__name__)
+
+    def _populate_queue_with_consumed_message(self, queue: queue.Queue):
+        if not self.consumed_messages:
+            return
+
+        for consumed_message in self.consumed_messages:
+            queue.put(consumed_message)
 
     def start_consume(self, queue: queue.Queue, stop_event: Event):
+
+        self._populate_queue_with_consumed_message(queue)
 
         try:
             while not stop_event.is_set():
