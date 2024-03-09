@@ -56,8 +56,11 @@ class MasterComponent:
         consumer_group_id = str(get_config("OBSERVER_CONSUMER_GROUP_ID", self, "observer"))
         deploy_delay = int(str(get_config("DEPLOY_DELAY", self, 60)))
         z_value = int(str(get_config("Z_VALUE", self, 3)))
+        window_max_second = int(str(get_config("WINDOW_MAX_SECOND", self, 300))) # 5 minutes default
+        input_output_ratio_threshold = float(str(get_config("INPUT_OUTPUT_RATIO_THRESHOLD", self, 0.7)))
+        input_output_refresh_rate = float(str(get_config("INPUT_OUTPUT_REFRESH_RATE", self, 0.7)))
 
-        statistic_worker = StatisticWorker(maximum_seconds=300)
+        statistic_worker = StatisticWorker(maximum_seconds=window_max_second)
         topic_spike_checker = TopicSpikeChecker(statistic_worker)
         deploy_script= DeployScripts()
 
@@ -68,8 +71,8 @@ class MasterComponent:
         )
 
         input_output_worker = InputOutputRatioWorker(
-            refresh_rate_second=60,
-            input_output_ratio_threshold=0.7,
+            refresh_rate_second=input_output_refresh_rate,
+            input_output_ratio_threshold=input_output_ratio_threshold,
             below_threshold_callback=auto_deployer.deploy
         )
 

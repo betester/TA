@@ -4,7 +4,7 @@ import asyncio
 from asyncio.locks import Lock
 from collections.abc import Callable, Coroutine
 from datetime import datetime
-from enum import StrEnum
+from enum import Enum 
 from typing import Any, Optional
 
 from pydantic import BaseModel, ConfigDict
@@ -21,7 +21,7 @@ class MachineConditionData(BaseModel):
     timestamp: int
     total_messages: int
     
-class CloudProvider(StrEnum):
+class CloudProvider(str, Enum):
     LOCAL = "LOCAL"
     GOOGLE_CLOUD = "GOOGLE_CLOUD" 
     AWS = "AWS"
