@@ -1,0 +1,9 @@
+{
+	"ANALYZER_PRODUCER_TOPIC":  "client",
+	"ANALYZER_PRODUCER_SERVERS":  "kafka:9092",
+	"ANALYZER_CONSUMER_TOPIC":  "analyze",
+	"ANALYZER_CONSUMER_SERVERS":  "kafka:9092",
+	"ANALYZER_CONSUMER_GROUP_ID":  "analyzer",
+	"is_disaster":  self, "./mocking_bird",
+	"keyword":  self, "./jay_bird"
+}

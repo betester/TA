@@ -1,0 +1,5 @@
+{
+	"CRAWLER_ANALYZER_SERVERS":  "kafka:9092",
+	"CRAWLER_PRODUCER_TOPIC":  "analyze",
+	"CRAWLER_CONSUMER_GROUP_ID":  "crawler"
+}
