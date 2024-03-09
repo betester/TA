@@ -20,5 +20,5 @@ gcloud compute instances create "$instance_name" \
     --shielded-vtpm \
     --shielded-integrity-monitoring \
     --labels=goog-ec-src=vm_add-gcloud \
-    --metadata="$envs" \
+    --metadata-from-file="$envs" \
     --reservation-affinity=any
