@@ -5,7 +5,7 @@ from analyzer.processor import AnalyzerProcessor
 from fogverse.consumer_producer import ConfluentConsumer, ConfluentProducer
 from fogverse.general import ParallelRunnable
 from fogverse.util import get_config
-from master.contract import CloudDeployConfigs, TopicDeploymentConfig
+from master.contract import CloudDeployConfigs, CloudProvider, TopicDeploymentConfig
 from master.master import ConsumerAutoScaler, ProducerObserver
 from .analyzer import DisasterAnalyzerImpl
 from .handler import AnalyzerProducer, ParallelAnalyzerJobService
@@ -24,6 +24,7 @@ class AnalyzerComponent:
 
         # cloud configs 
         self._zone = str(get_config("CLOUD_ZONE", self, "ap-southeast-1"))
+        self._cloud_provider = str(get_config("CLOUD_PROVIDER", self, "LOCAL"))
         # set the env from the above
         self._env  = {}
 
@@ -39,6 +40,7 @@ class AnalyzerComponent:
                 topic_id=self._producer_topic,
                 service_name="analyzer",
                 cloud_deploy_configs=CloudDeployConfigs(
+                    provider=self._cloud_provider,
                     zone=self._zone,
                     env=self._env
                 )

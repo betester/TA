@@ -15,5 +15,7 @@ python -m \"$service_name\""
 # Replace the placeholder with the actual repository URL
 command="${command_template/REPOSITORY_URL/$github_repository}"
 
+echo "$command"
+
 # SSH into the instance and execute the command
 gcloud compute ssh "$instance_name" --zone="$zone" --command="$command"

@@ -27,7 +27,7 @@ class CloudProvider(str, Enum):
     AWS = "AWS"
 
 class CloudDeployConfigs(BaseModel):
-    provider: CloudProvider = CloudProvider.LOCAL
+    provider: str = CloudProvider.LOCAL
     zone: str
     env: dict[str, str]
 

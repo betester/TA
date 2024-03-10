@@ -3,7 +3,7 @@ annotated-types==0.6.0
 async-timeout==4.0.3
 confluent-kafka==2.3.0
 numpy==1.26.4
-opencv-python==4.9.0.80
+opencv-python-headless==4.9.0.80
 packaging==23.2
 pydantic==2.6.3
 pydantic_core==2.16.3
