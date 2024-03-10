@@ -41,7 +41,7 @@ class MasterComponent:
         z_value = int(str(get_config("Z_VALUE", self, 3)))
         window_max_second = int(str(get_config("WINDOW_MAX_SECOND", self, 300))) # 5 minutes default
         input_output_ratio_threshold = float(str(get_config("INPUT_OUTPUT_RATIO_THRESHOLD", self, 0.7)))
-        input_output_refresh_rate = float(str(get_config("INPUT_OUTPUT_REFRESH_RATE", self, 0.7)))
+        input_output_refresh_rate = float(str(get_config("INPUT_OUTPUT_REFRESH_RATE", self, 60)))
 
         statistic_worker = StatisticWorker(maximum_seconds=window_max_second)
         topic_spike_checker = TopicSpikeChecker(statistic_worker)
