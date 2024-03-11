@@ -28,4 +28,4 @@ jobs:
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
         run: |
-          python scripts/build_and_push_images.py
+          python ./scripts/build_and_push_images.py
