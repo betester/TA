@@ -10,7 +10,8 @@ for file in os.listdir("dockerfiles"):
         # Get the extension name from the file
         extension_name = file.split(".")[1]
         # Build the Docker image
-        os.system(f"docker build -t {extension_name} -f {file} .")
+        dockerfile_path = os.path.join("dockerfiles", file)
+        os.system(f"docker build -t {extension_name} -f {dockerfile_path} .")
         # Tag the Docker image
         os.system(f"docker tag {extension_name}:latest {dockerhub_username}/{extension_name}:latest")
         # Push the Docker image to Docker Hub
