@@ -16,13 +16,14 @@ async def deploy_local_instance(
     image_name: str,
     zone: str,
     service_account: str,
-    container_envs: dict[str, str]
+    container_env: str 
     ):
 
     cmd = (
         f"gcloud compute instances create-with-container {service_name} "
             f"--project={project_name} "
             f"--zone={zone} "
+            f"--container-image={image_name} "
             "--machine-type=e2-medium "
             "--network-interface=network-tier=PREMIUM,subnet=default "
             "--maintenance-policy=MIGRATE "
@@ -34,20 +35,20 @@ async def deploy_local_instance(
             "--boot-disk-size=10GB "
             "--boot-disk-type=pd-balanced "
             f"--boot-disk-device-name={service_name} "
-            f"--container-image={image_name} "
             "--container-restart-policy=always "
+            f"--container-env-file={container_env} "
     )
 
-    for key, value in container_envs.items():
-        cmd += f"--container-env={key}={value} "
 
     cmd += (
         "--container-mount-host-path=host-path=/tmp,mode=rw,mount-path=/bitnami "
-            "--no-shielded-secure-boot "
-            "--shielded-vtpm "
-            "--shielded-integrity-monitoring "
-            "--labels=goog-ec-src=vm_add-gcloud,container-vm=cos-stable-109-17800-147-28"
+        "--no-shielded-secure-boot "
+        "--shielded-vtpm "
+        "--shielded-integrity-monitoring "
+        "--labels=goog-ec-src=vm_add-gcloud,container-vm=cos-stable-109-17800-147-28"
     )
+
+    print(cmd)
 
     process = await asyncio.create_subprocess_shell(
         cmd,
@@ -71,24 +72,28 @@ async def main():
     assert ZONE is not None
     SERVICE_ACCOUNT = os.environ.get("SERVICE_ACCOUNT")
     assert SERVICE_ACCOUNT is not None
-    DOCKER_USERNAME = os.environ.get("DOCKER_USERNAME") 
-    assert DOCKER_USERNAME is not None
     
-    service_configs_path = [os.path.join(config_path, file) for file in os.listdir(config_path) if file.endswith('.json')]
+    config_names = [file.replace(".txt", "") for file in os.listdir(config_path) if file.endswith('.txt')]
 
-    for service_config_path in service_configs_path:
-        with open(service_config_path) as f:
-            if f.name != "kafka.json":
-                continue
-            service_name = f.name.replace('.json', '')
-            service_envs = json.load(f)
+    for config_name in config_names:
+
+        if config_name != 'crawler':
+            continue
+
+        config_source = f"{os.path.join(config_path, config_name)}.txt"
+        config_metadata = f"{os.path.join(config_path, config_name)}.json"
+
+        with open(config_metadata) as f:
+            metadata = json.load(f) 
+            image_name = metadata['IMAGE']
+
             await deploy_local_instance(
                 PROJECT,
-                service_name,
-                f"{DOCKER_USERNAME}/service_name",
+                config_name,
+                image_name,
                 ZONE,
                 SERVICE_ACCOUNT,
-                service_envs
+                config_source
             )
 
 if __name__ == "__main__":
