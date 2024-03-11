@@ -4,11 +4,8 @@ import os
 # Get Docker Hub username from environment variable
 dockerhub_username = os.environ.get("DOCKERHUB_USERNAME")
 
-# Navigate to the dockerfiles directory
-os.chdir("dockerfiles")
-
 # Iterate over Dockerfiles
-for file in os.listdir("."):
+for file in os.listdir("dockerfiles"):
     if file.startswith("Dockerfile."):
         # Get the extension name from the file
         extension_name = file.split(".")[1]
