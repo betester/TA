@@ -19,11 +19,12 @@ class AnalyzerComponent:
         self._consumer_servers = str(get_config("ANALYZER_CONSUMER_SERVERS", self, "localhost:9092"))
         self._consumer_group_id = str(get_config("ANALYZER_CONSUMER_GROUP_ID", self, "analyzer_v2"))
         # assigns based on the attribute and model source
-        self._disaster_classifier_model_source = ("is_disaster", str(get_config("DISASTER_CLASSIFIER_MODEL_SOURCE", self, "./mocking_bird")))
-        self._keyword_classifier_model_source = ("keyword", str(get_config("KEYWORD_CLASSIFIER_MODEL_SOURCE", self, "./jay_bird")))
+        self._disaster_classifier_model_source = ("is_disaster", str(get_config("DISASTER_CLASSIFIER_MODEL_SOURCE", self, "betester/mocking_bird")))
+        self._keyword_classifier_model_source = ("keyword", str(get_config("KEYWORD_CLASSIFIER_MODEL_SOURCE", self, "betester/jay_bird")))
 
         # cloud configs 
         self._zone = str(get_config("CLOUD_ZONE", self, "ap-southeast-1"))
+        self._cloud_provider = str(get_config("CLOUD_PROVIDER", self, "LOCAL"))
         # set the env from the above
         self._env  = {}
 
@@ -39,6 +40,7 @@ class AnalyzerComponent:
                 topic_id=self._producer_topic,
                 service_name="analyzer",
                 cloud_deploy_configs=CloudDeployConfigs(
+                    provider=self._cloud_provider,
                     zone=self._zone,
                     env=self._env
                 )

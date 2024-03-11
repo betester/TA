@@ -1,8 +1,5 @@
 
-from collections.abc import Callable, Coroutine
-from typing import Tuple
 from fogverse.util import get_config
-from master.contract import DeployResult, TopicDeploymentConfig
 from master.event_handler import Master
 from master.master import AutoDeployer, ConsumerAutoScaler, DeployScripts, ProducerObserver, TopicSpikeChecker
 from confluent_kafka.admin import AdminClient
@@ -13,14 +10,6 @@ from master.worker import InputOutputRatioWorker, StatisticWorker
 
 
 class MasterComponent:
-
-    def __init__(self):
-        self.local_machine_ids = ['local'] 
-        self.local_topic_machine_consumer: dict[str, list[str]] = {
-            'analyze': self.local_machine_ids,
-            'crawler': self.local_machine_ids,
-            'client' : self.local_machine_ids
-        }
 
     def consumer_auto_scaler(self):
         
@@ -43,21 +32,18 @@ class MasterComponent:
         observer_topic = str(get_config("OBSERVER_TOPIC", self, "observer"))
         return ProducerObserver(observer_topic)
 
-    async def mock_deploy(self, topic_configs: TopicDeploymentConfig) -> DeployResult:
-        print(f"Deploying {topic_configs.topic_id}")
-        return DeployResult(
-            machine_id="mock",
-            shut_down_machine= lambda x : True 
-        )
-    
     def master_event_handler(self):
         consumer_topic = str(get_config("OBSERVER_CONSUMER_TOPIC", self, "observer"))
         consumer_servers = str(get_config("OBSERVER_CONSUMER_SERVERS", self, "localhost:9092"))
+        print(consumer_servers)
         consumer_group_id = str(get_config("OBSERVER_CONSUMER_GROUP_ID", self, "observer"))
         deploy_delay = int(str(get_config("DEPLOY_DELAY", self, 60)))
         z_value = int(str(get_config("Z_VALUE", self, 3)))
+        window_max_second = int(str(get_config("WINDOW_MAX_SECOND", self, 300))) # 5 minutes default
+        input_output_ratio_threshold = float(str(get_config("INPUT_OUTPUT_RATIO_THRESHOLD", self, 0.7)))
+        input_output_refresh_rate = float(str(get_config("INPUT_OUTPUT_REFRESH_RATE", self, 60)))
 
-        statistic_worker = StatisticWorker(maximum_seconds=300)
+        statistic_worker = StatisticWorker(maximum_seconds=window_max_second)
         topic_spike_checker = TopicSpikeChecker(statistic_worker)
         deploy_script= DeployScripts()
 
@@ -68,8 +54,8 @@ class MasterComponent:
         )
 
         input_output_worker = InputOutputRatioWorker(
-            refresh_rate_second=60,
-            input_output_ratio_threshold=0.7,
+            refresh_rate_second=input_output_refresh_rate,
+            input_output_ratio_threshold=input_output_ratio_threshold,
             below_threshold_callback=auto_deployer.deploy
         )
 

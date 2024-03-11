@@ -3,8 +3,7 @@ from collections.abc import Callable
 from threading import Event
 import socket
 import sys
-from typing import Any
-from typing_extensions import Optional
+from typing import Any, Optional
 import uuid
 import queue
 

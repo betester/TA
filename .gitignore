@@ -1,4 +1,4 @@
-env
+*env*
 *pycache*
 *joblib*
 *-logs*

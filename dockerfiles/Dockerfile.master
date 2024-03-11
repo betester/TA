@@ -1,0 +1,10 @@
+FROM python:3.11
+
+WORKDIR /app
+COPY master ./master
+COPY fogverse ./fogverse
+COPY requirements/master.txt ./
+
+RUN pip install -r master.txt
+
+CMD ["python","-m", "master"]
