@@ -5,7 +5,7 @@ COPY crawler ./crawler
 COPY fogverse ./fogverse
 COPY master ./master
 COPY data ./data
-COPY ./requirements/crawler.txt ./
+COPY requirements/crawler.txt ./
 
 RUN pip install -r crawler.txt
 

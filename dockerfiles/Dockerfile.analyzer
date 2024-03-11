@@ -7,7 +7,7 @@ COPY fogverse ./fogverse
 COPY crawler ./crawler
 COPY mocking_bird ./mocking_bird
 COPY jay_bird ./jay_bird
-COPY ./requirements/analyzer.txt ./
+COPY requirements/analyzer.txt ./
 
 RUN pip install -r analyzer.txt
 
