@@ -24,9 +24,10 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       # Run Python script to build and push Docker images
-      - uses: actions/checkout@v2
       - name: Build and push docker images
+      - uses: actions/checkout@v2
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
         run: |
+          ls -la
           python ./scripts/build_and_push_images.py
