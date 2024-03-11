@@ -5,7 +5,7 @@ from analyzer.processor import AnalyzerProcessor
 from fogverse.consumer_producer import ConfluentConsumer, ConfluentProducer
 from fogverse.general import ParallelRunnable
 from fogverse.util import get_config
-from master.contract import CloudDeployConfigs, TopicDeploymentConfig
+from master.contract import CloudDeployConfigs, CloudProvider, TopicDeploymentConfig
 from master.master import ConsumerAutoScaler, ProducerObserver
 from .analyzer import DisasterAnalyzerImpl
 from .handler import AnalyzerProducer, ParallelAnalyzerJobService
@@ -19,14 +19,12 @@ class AnalyzerComponent:
         self._consumer_servers = str(get_config("ANALYZER_CONSUMER_SERVERS", self, "localhost:9092"))
         self._consumer_group_id = str(get_config("ANALYZER_CONSUMER_GROUP_ID", self, "analyzer_v2"))
         # assigns based on the attribute and model source
-        self._disaster_classifier_model_source = ("is_disaster", str(get_config("DISASTER_CLASSIFIER_MODEL_SOURCE", self, "betester/mocking_bird")))
-        self._keyword_classifier_model_source = ("keyword", str(get_config("KEYWORD_CLASSIFIER_MODEL_SOURCE", self, "betester/jay_bird")))
+        self._disaster_classifier_model_source = ("is_disaster", str(get_config("DISASTER_CLASSIFIER_MODEL_SOURCE", self, "./mocking_bird")))
+        self._keyword_classifier_model_source = ("keyword", str(get_config("KEYWORD_CLASSIFIER_MODEL_SOURCE", self, "./jay_bird")))
 
         # cloud configs 
         self._zone = str(get_config("CLOUD_ZONE", self, "ap-southeast-1"))
         self._cloud_provider = str(get_config("CLOUD_PROVIDER", self, "LOCAL"))
-        # set the env from the above
-        self._env  = {}
 
 
     def disaster_analyzer(self, consumer_auto_scaler: Optional[ConsumerAutoScaler], producer_observer: ProducerObserver):
@@ -40,9 +38,8 @@ class AnalyzerComponent:
                 topic_id=self._producer_topic,
                 service_name="analyzer",
                 cloud_deploy_configs=CloudDeployConfigs(
-                    provider=self._cloud_provider,
-                    zone=self._zone,
-                    env=self._env
+                    provider=CloudProvider[self._cloud_provider],
+                    zone=self._zone
                 )
             )
 
@@ -83,7 +80,7 @@ class AnalyzerComponent:
                 service_name="analyzer",
                 cloud_deploy_configs=CloudDeployConfigs(
                     zone=self._zone,
-                    env=self._env
+                    provider=CloudProvider[self._cloud_provider]
                 )
             )
 

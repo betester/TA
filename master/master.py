@@ -1,6 +1,9 @@
 from asyncio import StreamReader, Task
+
 import os
+import json
 import time
+from uuid import uuid4
 
 from collections.abc import Callable, Coroutine
 from typing import Any, Optional
@@ -313,13 +316,16 @@ class DeployScripts:
                 async for line in stdout:
                     f.write(line.decode('utf-8'))
         except Exception as e:
-            print(f"An error occurred while writing logs: {e}")
-
+            self._logger.error(f"An error occurred while writing logs: {e}")
+    
+    async def _write_deploy_logs(self, stdout: StreamReader):
+        try:
+            async for line in stdout:
+                self._logger.info(line.decode('utf-8'))
+        except Exception as e:
+            self._logger.error(f"An error occurred while writing logs: {e}")
+    
     async def _local_deployment(self, configs: TopicDeploymentConfig) -> DeployResult:
-
-        # sets every environment variable passed on the configs
-        for key, val in configs.cloud_deploy_configs.env:
-            os.environ[key] = val
 
         cmd = f'python -m {configs.service_name}'
         self._logger.info(f"Running script: {cmd}")
@@ -330,11 +336,10 @@ class DeployScripts:
             stderr = STDOUT
         )
 
-        async def kill_process_and_task(process: Process, task: Task) -> bool:
+        async def kill_process_and_task() -> bool:
             self._logger.info(f"Shutting down {process.pid}")
             try:
                 process.kill()
-                task.cancel()
                 return True
             except Exception as e:
                 self._logger.error(f"Fail shutting down process {process.pid}, please turn off them manually", e)
@@ -344,18 +349,96 @@ class DeployScripts:
         if process.stdout:
             log_file_name = f'{configs.service_name}-{process.pid}.log'
             self._logger.info(f"Writing service {configs.service_name} logs with filename: {log_file_name}")
-            task = asyncio.create_task(self.write_deployed_service_logs(log_file_name, process.stdout)) 
+            asyncio.create_task(self.write_deployed_service_logs(log_file_name, process.stdout)) 
             self._logger.info(f"Command executed successfully, service {configs.service_name} is deployed")
             return DeployResult(
-                machine_id=process.pid,
-                shut_down_machine= lambda process_pid : kill_process_and_task(process, task)
+                machine_id=str(process.pid),
+                shut_down_machine= kill_process_and_task
             ) 
 
         raise Exception("Process cannot be created")
 
 
     async def _gooogle_deployment(self, configs: TopicDeploymentConfig) -> DeployResult:
-        pass
+
+        project_name = os.environ.get("PROJECT")
+        assert project_name is not None
+        zone = configs.cloud_deploy_configs.zone
+        assert zone is not None
+        service_account = os.environ.get("SERVICE_ACCOUNT")
+        assert service_account is not None
+
+        config_path = "configs"
+
+        config_source = f"{os.path.join(config_path, configs.service_name)}.txt"
+        config_metadata = f"{os.path.join(config_path, configs.service_name)}.json"
+
+        unique_id = str(uuid4())[:6]
+        service_name = configs.service_name + unique_id
+
+        with open(config_metadata) as f: 
+            metadata = json.load(f) 
+            image_name = metadata['IMAGE']
+
+
+        cmd = (
+            f"gcloud compute instances create-with-container {service_name} "
+                f"--project={project_name} "
+                f"--zone={zone} "
+                f"--container-image={image_name} "
+                "--machine-type=n1-standard-2 "
+                "--network-interface=network-tier=PREMIUM,subnet=default "
+                "--maintenance-policy=TERMINATE "
+                "--provisioning-model=STANDARD "
+                f"--service-account={service_account} "
+                "--scopes=https://www.googleapis.com/auth/devstorage.read_only,https://www.googleapis.com/auth/logging.write,https://www.googleapis.com/auth/monitoring.write,https://www.googleapis.com/auth/servicecontrol,https://www.googleapis.com/auth/service.management.readonly,https://www.googleapis.com/auth/trace.append "
+                "--accelerator=count=1,type=nvidia-tesla-t4"
+                "--tags=http-server,https-server "
+                "--image=projects/ml-images/global/images/c2-deeplearning-pytorch-2-2-cu121-v20240306-debian-11 "
+                "--boot-disk-size=50GB "
+                "--boot-disk-type=pd-balanced "
+                f"--boot-disk-device-name={service_name} "
+                "--container-restart-policy=always "
+                f"--container-env-file={config_source} "
+        )
+
+        cmd += (
+            "--no-shielded-secure-boot "
+            "--shielded-vtpm "
+            "--shielded-integrity-monitoring "
+            "--labels=goog-ec-src=vm_add-gcloud,container-vm=cos-stable-109-17800-147-28"
+        )
+
+        process = await asyncio.create_subprocess_shell(
+            cmd,
+            stdin = PIPE,
+            stdout = PIPE, 
+            stderr = STDOUT
+        )
+
+        async def shutdown_google_cloud_instance():
+            shutdown_cmd = f"gcloud compute instance stop {service_name} --zone={zone} --project={project_name}"
+            shutdown_process = await asyncio.create_subprocess_shell(
+                shutdown_cmd,
+                stdin = PIPE,
+                stdout = PIPE, 
+                stderr = STDOUT
+            )
+
+            if shutdown_process.stdout:
+                asyncio.create_task(self._write_deploy_logs(shutdown_process.stdout))
+
+            return True
+
+
+        if process.stdout:
+            asyncio.create_task(self._write_deploy_logs(process.stdout)) 
+            return DeployResult(
+                machine_id=f"{service_name};{project_name};{zone}",
+                shut_down_machine = shutdown_google_cloud_instance
+            ) 
+
+        raise Exception("Process cannot be created")
 
 class AutoDeployer(MasterObserver):
 
