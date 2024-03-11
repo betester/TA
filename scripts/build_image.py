@@ -18,3 +18,5 @@ for file in os.listdir("."):
         os.system(f"docker tag {extension_name}:latest {dockerhub_username}/{extension_name}:latest")
         # Push the Docker image to Docker Hub
         os.system(f"docker push {dockerhub_username}/{extension_name}:latest")
+
+        os.system(f"docker image rm {extension_name}")
