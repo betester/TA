@@ -25,7 +25,7 @@ jobs:
 
       # Run Python script to build and push Docker images
       - name: Build and push docker images
-      - uses: actions/checkout@v2
+        uses: actions/checkout@v2
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
         run: |
