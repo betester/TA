@@ -29,5 +29,6 @@ jobs:
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
         run: |
+          cd $GITHUB_WORKSPACE
           python /scripts/build_image.py
 
