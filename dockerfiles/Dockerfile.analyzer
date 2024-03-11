@@ -1,4 +1,4 @@
-FROM python:3.11
+FROM pytorch/pytorch:2.2.1-cuda12.1-cudnn8-runtime
 
 WORKDIR /app
 COPY analyzer ./analyzer

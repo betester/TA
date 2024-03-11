@@ -40,7 +40,7 @@ class AnalyzerComponent:
                 service_name="analyzer",
                 cloud_deploy_configs=CloudDeployConfigs(
                     max_instance=self._max_instance,
-                    provider=CloudProvider[self._cloud_provider],
+                    provider=self._cloud_provider,
                     zone=self._zone
                 )
             )
@@ -83,7 +83,7 @@ class AnalyzerComponent:
                 cloud_deploy_configs=CloudDeployConfigs(
                     max_instance=self._max_instance,
                     zone=self._zone,
-                    provider=CloudProvider[self._cloud_provider]
+                    provider=self._cloud_provider
                 )
             )
 
