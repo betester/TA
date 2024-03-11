@@ -3,7 +3,7 @@ name: Deploy Image
 on:
   push:
     branches:
-      - cloud-deployment
+      - main
 
 jobs:
   deploy:

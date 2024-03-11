@@ -1,6 +1,7 @@
 # contains script for local deployment on the cloud
 
 import os
+import time
 import json
 import asyncio
 from asyncio.subprocess import PIPE, STDOUT 
@@ -16,7 +17,7 @@ async def deploy_local_instance(
     image_name: str,
     zone: str,
     service_account: str,
-    container_env: str 
+    container_env: str
     ):
 
     cmd = (
@@ -32,7 +33,7 @@ async def deploy_local_instance(
             "--scopes=https://www.googleapis.com/auth/devstorage.read_only,https://www.googleapis.com/auth/logging.write,https://www.googleapis.com/auth/monitoring.write,https://www.googleapis.com/auth/servicecontrol,https://www.googleapis.com/auth/service.management.readonly,https://www.googleapis.com/auth/trace.append "
             "--tags=http-server,https-server "
             "--image=projects/cos-cloud/global/images/cos-stable-109-17800-147-28 "
-            "--boot-disk-size=10GB "
+            "--boot-disk-size=25GB "
             "--boot-disk-type=pd-balanced "
             f"--boot-disk-device-name={service_name} "
             "--container-restart-policy=always "
@@ -48,7 +49,6 @@ async def deploy_local_instance(
         "--labels=goog-ec-src=vm_add-gcloud,container-vm=cos-stable-109-17800-147-28"
     )
 
-    print(cmd)
 
     process = await asyncio.create_subprocess_shell(
         cmd,
@@ -73,12 +73,24 @@ async def main():
     SERVICE_ACCOUNT = os.environ.get("SERVICE_ACCOUNT")
     assert SERVICE_ACCOUNT is not None
     
-    config_names = [file.replace(".txt", "") for file in os.listdir(config_path) if file.endswith('.txt')]
+    configs = {
+        "kafka" : {
+            "next_config": ["master"],
+            "wait_time": 10
+        },
+        "master" : {
+            "next_config": ["crawler", "analyzer"],
+            "wait_time": 5
+        }
+    }
 
-    for config_name in config_names:
+    current_config = ["kafka"]
 
-        if config_name != 'crawler':
-            continue
+    while len(current_config) != 0:
+
+        config_name = current_config.pop(-1)
+
+        print(f"Deploying {config_name} service")
 
         config_source = f"{os.path.join(config_path, config_name)}.txt"
         config_metadata = f"{os.path.join(config_path, config_name)}.json"
@@ -95,6 +107,19 @@ async def main():
                 SERVICE_ACCOUNT,
                 config_source
             )
+        
+        extra_config = configs.get(config_name, {})
+        wait_time = extra_config.get("wait_time", 0)
+
+        if wait_time != 0:
+            print(f"Waiting for {wait_time}, making sure {config_name} service is configured")
+            time.sleep(wait_time)
+    
+        next_config = extra_config.get("next_config", [])
+
+        for config in next_config:
+            print(f"Adding {config} for the next service to deploy")
+            current_config.append(config)
 
 if __name__ == "__main__":
     asyncio.run(main())

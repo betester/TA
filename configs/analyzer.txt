@@ -7,5 +7,5 @@ ANALYZER_CONSUMER_SERVERS=kafka.asia-southeast1-b.c.personal-project-408003.inte
 ANALYZER_CONSUMER_GROUP_ID=analyzer
 CLOUD_ZONE=ap-southeast-1
 CLOUD_PROVIDER=GOOGLE_CLOUD
-is_disaster=./mocking_bird
-keyword=./jay_bird
+DISASTER_CLASSIFIER_MODEL_SOURCE=betester/mocking_bird
+KEYWORD_CLASSIFIER_MODEL_SOURCE=betester/jay_bird
