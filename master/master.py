@@ -466,9 +466,11 @@ class AutoDeployer(MasterObserver):
         self._deploy_delay = deploy_delay
 
         self._logger = get_logger(name=self.__class__.__name__)
+        
         self._topic_deployment_configs: dict[str, TopicDeploymentConfig] = {}
         self._machine_ids: list[DeployResult] = []
         self._can_deploy_topic: dict[str, TopicDeployDelay] = {}
+        self._topic_total_deployment: dict[str, int] = {}
 
     async def delay_deploy(self, topic_id: str):
         await asyncio.sleep(self._deploy_delay)
@@ -497,9 +499,21 @@ class AutoDeployer(MasterObserver):
                 return False
 
             async with self._can_deploy_topic[target_topic]._lock:
+
                 if not self._can_deploy_topic[target_topic].can_be_deployed:
                     time_remaining = get_timestamp() - self._can_deploy_topic[target_topic].deployed_timestamp
                     self._logger.info(f"Cannot be deployed yet, time remaining: {time_remaining}")
+                    return False
+            
+                maximum_topic_deployment = self._topic_deployment_configs[target_topic].cloud_deploy_configs.max_instance
+                current_deployed_replica = self._topic_total_deployment.get(target_topic, 0)
+
+                if current_deployed_replica >= maximum_topic_deployment:
+                    self._logger.info(
+                        f"Cannot deploy service {self._topic_deployment_configs[target_topic].service_name} exceeds maximum limit.\n" 
+                        f"current deployed : {current_deployed_replica}\n"
+                        f"maximum replica : {maximum_topic_deployment}"
+                    )
                     return False
 
                 if self._should_be_deployed(source_topic, source_total_calls):
@@ -522,7 +536,7 @@ class AutoDeployer(MasterObserver):
     
     async def stop(self):
         for deploy_result in self._machine_ids:
-            await deploy_result.shut_down_machine(deploy_result.machine_id)
+            await deploy_result.shut_down_machine()
 
 class TopicSpikeChecker:
 

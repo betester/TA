@@ -25,6 +25,7 @@ class AnalyzerComponent:
         # cloud configs 
         self._zone = str(get_config("CLOUD_ZONE", self, "ap-southeast-1"))
         self._cloud_provider = str(get_config("CLOUD_PROVIDER", self, "LOCAL"))
+        self._max_instance = int(str(get_config("MAX_INSTANCE", self, "4")))
 
 
     def disaster_analyzer(self, consumer_auto_scaler: Optional[ConsumerAutoScaler], producer_observer: ProducerObserver):
@@ -38,6 +39,7 @@ class AnalyzerComponent:
                 topic_id=self._producer_topic,
                 service_name="analyzer",
                 cloud_deploy_configs=CloudDeployConfigs(
+                    max_instance=self._max_instance,
                     provider=CloudProvider[self._cloud_provider],
                     zone=self._zone
                 )
@@ -79,6 +81,7 @@ class AnalyzerComponent:
                 topic_id=self._producer_topic,
                 service_name="analyzer",
                 cloud_deploy_configs=CloudDeployConfigs(
+                    max_instance=self._max_instance,
                     zone=self._zone,
                     provider=CloudProvider[self._cloud_provider]
                 )

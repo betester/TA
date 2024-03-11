@@ -27,6 +27,7 @@ class CloudProvider(StrEnum):
 
 class CloudDeployConfigs(BaseModel):
     zone: str
+    max_instance: int
     provider: CloudProvider = CloudProvider.LOCAL
 
 class TopicDeploymentConfig(BaseModel):
