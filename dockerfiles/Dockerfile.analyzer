@@ -6,6 +6,7 @@ COPY master ./master
 COPY fogverse ./fogverse
 COPY crawler ./crawler
 COPY requirements/analyzer.txt ./
+COPY scripts ./scripts
 
 RUN pip install -r analyzer.txt
 
