@@ -48,6 +48,8 @@ class MasterComponent:
         random_unique_id = uuid4()
         machine_id = f"{topic_deployment_config.service_name}{random_unique_id}"
 
+        print(f"Deploying google instance with id : {machine_id}")
+
         await deploy_instance(
             topic_deployment_config.project_name,
             machine_id,

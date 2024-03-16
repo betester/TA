@@ -436,7 +436,8 @@ class AutoDeployer(MasterObserver):
                     return False
 
                 if self._should_be_deployed(source_topic, source_total_calls):
-                    self._logger.info(f"Deploying new machine for service {service_name}")
+                    self._logger.info(f"Deploying new machine for service {service_name} to cloud provider: {provider}")
+
                     machine_deployer = self._deploy_scripts.get_deploy_functions(
                         self._topic_deployment_configs[target_topic].provider
                     )
@@ -445,7 +446,10 @@ class AutoDeployer(MasterObserver):
                         self._logger.info(f"No deploy script for {provider}, deployment cancelled (you might need to set up deloy script on component)")
                         return False
 
+                    self._logger.info("Starting deployment script")
+                    starting_time = get_timestamp()
                     deploy_result = await machine_deployer(self._topic_deployment_configs[target_topic])
+                    self._logger.info(f"Deployment finished, time taken: {starting_time - get_timestamp()}")
                         
                     if not deploy_result:
                         self._logger.error(f"Deployment failed for service {service_name}")
