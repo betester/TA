@@ -17,7 +17,7 @@ gcloud compute instances create-with-container ${service_name} \
     --maintenance-policy=MIGRATE \
     --provisioning-model=STANDARD \
     --service-account=${service_account} \
-    --scopes=https://www.googleapis.com/auth/devstorage.read_only,https://www.googleapis.com/auth/logging.write,https://www.googleapis.com/auth/monitoring.write,https://www.googleapis.com/auth/servicecontrol,https://www.googleapis.com/auth/service.management.readonly,https://www.googleapis.com/auth/trace.append \
+    --scopes=https://www.googleapis.com/auth/cloud-platform \
     --tags=http-server,https-server \
     --image=projects/cos-cloud/global/images/cos-stable-109-17800-147-28 \
     --boot-disk-size=10GB \

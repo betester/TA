@@ -5,7 +5,7 @@ from analyzer.processor import AnalyzerProcessor
 from fogverse.consumer_producer import ConfluentConsumer, ConfluentProducer
 from fogverse.general import ParallelRunnable
 from fogverse.util import get_config
-from master.contract import CloudDeployConfigs, CloudProvider, TopicDeploymentConfig
+from master.contract import CloudProvider, TopicDeploymentConfig
 from master.master import ConsumerAutoScaler, ProducerObserver
 from .analyzer import DisasterAnalyzerImpl
 from .handler import AnalyzerProducer, ParallelAnalyzerJobService
@@ -23,9 +23,24 @@ class AnalyzerComponent:
         self._keyword_classifier_model_source = ("keyword", str(get_config("KEYWORD_CLASSIFIER_MODEL_SOURCE", self, "./jay_bird")))
 
         # cloud configs 
-        self._zone = str(get_config("CLOUD_ZONE", self, "ap-southeast-1"))
         self._cloud_provider = str(get_config("CLOUD_PROVIDER", self, "LOCAL"))
         self._max_instance = int(str(get_config("MAX_INSTANCE", self, "4")))
+        self._machine_type = str(get_config("MACHINE_TYPE", self, "GPU"))
+
+        self._container_env = {
+            "MACHINE_TYPE": self._machine_type,
+            "MAX_INSTANCE": self._max_instance,
+            "CLOUD_PROVIDER": self._cloud_provider,
+            "keyword": self._keyword_classifier_model_source,
+            "is_disaster": self._disaster_classifier_model_source,
+            "ANALYZER_CONSUMER_GROUP_ID": self._consumer_group_id,
+            "ANALYZER_CONSUMER_SERVERS": self._consumer_servers,
+            "ANALYZER_CONSUMER_TOPIC": self._consumer_topic,
+            "ANALYZER_PRODUCER_SERVERS": self._producer_servers,
+            "ANALYZER_PRODUCER_TOPIC": self._producer_topic,
+
+        }
+
 
 
     def disaster_analyzer(self, consumer_auto_scaler: Optional[ConsumerAutoScaler], producer_observer: ProducerObserver):
@@ -36,13 +51,14 @@ class AnalyzerComponent:
         )
         
         topic_deployment_config = TopicDeploymentConfig(
-                topic_id=self._producer_topic,
-                service_name="analyzer",
-                cloud_deploy_configs=CloudDeployConfigs(
-                    max_instance=self._max_instance,
-                    provider=self._cloud_provider,
-                    zone=self._zone
-                )
+                project_name=str(get_config("PROJECT_NAME", self, "")),
+                service_name=str(get_config("SERVICE_NAME", self, "")),
+                image_name=str(get_config("IMAGE_NAME", self, "")),
+                zone=str(get_config("ZONE", self, "")),
+                service_account=str(get_config("SERVICE_ACCOUNT", self, "")),
+                image_env=self._container_env,
+                machine_type=self._machine_type,
+                provider=CloudProvider[self._cloud_provider]
             )
 
         analyzer_producer = AnalyzerProducer(
@@ -78,14 +94,15 @@ class AnalyzerComponent:
         )
 
         topic_deployment_config = TopicDeploymentConfig(
-                topic_id=self._producer_topic,
-                service_name="analyzer",
-                cloud_deploy_configs=CloudDeployConfigs(
-                    max_instance=self._max_instance,
-                    zone=self._zone,
-                    provider=self._cloud_provider
-                )
-            )
+            project_name=str(get_config("PROJECT_NAME", self, "")),
+            service_name=str(get_config("SERVICE_NAME", self, "")),
+            image_name=str(get_config("IMAGE_NAME", self, "")),
+            zone=str(get_config("ZONE", self, "")),
+            service_account=str(get_config("SERVICE_ACCOUNT", self, "")),
+            image_env=self._container_env,
+            machine_type=self._machine_type,
+            provider=CloudProvider[self._cloud_provider]
+        )
 
         start_producer_callback = functools.partial(
             producer_observer.send_input_output_ratio_pair,

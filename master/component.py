@@ -1,11 +1,14 @@
 
+from uuid import uuid4
 from fogverse.util import get_config
+from master.contract import CloudProvider, DeployResult, TopicDeploymentConfig
 from master.event_handler import Master
 from master.master import AutoDeployer, ConsumerAutoScaler, DeployScripts, ProducerObserver, TopicSpikeChecker
 from confluent_kafka.admin import AdminClient
 from functools import partial
 
 from master.worker import InputOutputRatioWorker, StatisticWorker
+from scripts.local_deploy import deploy_instance
 
 
 
@@ -32,6 +35,41 @@ class MasterComponent:
         observer_topic = str(get_config("OBSERVER_TOPIC", self, "observer"))
         return ProducerObserver(observer_topic)
 
+    def parse_dict_to_docker_env(self, container_env: dict):
+        docker_container_env = ""
+
+        for key, val in container_env.items():
+            docker_container_env += f" -e {key}={val}"
+
+        return docker_container_env
+
+    async def google_deployment(self, topic_deployment_config: TopicDeploymentConfig) -> DeployResult:
+        
+        random_unique_id = uuid4()
+        machine_id = f"{topic_deployment_config.service_name}{random_unique_id}"
+
+        await deploy_instance(
+            topic_deployment_config.project_name,
+            machine_id,
+            topic_deployment_config.image_name,
+            topic_deployment_config.zone,
+            topic_deployment_config.service_account,
+            self.parse_dict_to_docker_env(topic_deployment_config.image_env),
+            topic_deployment_config.machine_type
+        )
+
+        async def shutdown_google_cloud_instance():
+            print("Not implemented yet")
+            return True
+        
+        
+        return DeployResult(
+            machine_id=machine_id, 
+            shut_down_machine=shutdown_google_cloud_instance
+        )
+
+
+
     def master_event_handler(self):
         consumer_topic = str(get_config("OBSERVER_CONSUMER_TOPIC", self, "observer"))
         consumer_servers = str(get_config("OBSERVER_CONSUMER_SERVERS", self, "localhost:9092"))
@@ -46,7 +84,10 @@ class MasterComponent:
         statistic_worker = StatisticWorker(maximum_seconds=window_max_second)
         topic_spike_checker = TopicSpikeChecker(statistic_worker)
         deploy_script = DeployScripts()
+
         deploy_script.set_deploy_functions(
+            CloudProvider["GOOGLE_CLOUD"],
+            self.google_deployment
         )
 
         auto_deployer = AutoDeployer(

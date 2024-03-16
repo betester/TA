@@ -4,8 +4,8 @@ WORKDIR /app
 COPY master ./master
 COPY fogverse ./fogverse
 COPY requirements/master.txt ./
+COPY --chmod=755 scripts/create_cpu_instance.sh scripts/create_cpu_instance.sh ./scripts
 
-COPY --chmod=755 scripts ./scripts
 RUN pip install -r master.txt
 
 CMD ["python","-m", "master"]

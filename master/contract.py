@@ -25,15 +25,15 @@ class CloudProvider(str, Enum):
     LOCAL = "LOCAL"
     GOOGLE_CLOUD = "GOOGLE_CLOUD" 
 
-class CloudDeployConfigs(BaseModel):
-    zone: str
-    max_instance: int
-    provider: str = CloudProvider.LOCAL
-
 class TopicDeploymentConfig(BaseModel):
-    topic_id: str
+    project_name: str
     service_name: str
-    cloud_deploy_configs: CloudDeployConfigs
+    image_name: str
+    zone: str
+    service_account: str
+    image_env: dict 
+    machine_type: str
+    provider: CloudProvider
 
 #TODO: rename this into something else
 class InputOutputThroughputPair(BaseModel):

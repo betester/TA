@@ -15,7 +15,7 @@ gcloud compute instances create "$instance_name" \
     --maintenance-policy=TERMINATE \
     --provisioning-model=STANDARD \
     --service-account="$service_account" \
-    --scopes=https://www.googleapis.com/auth/devstorage.read_only,https://www.googleapis.com/auth/logging.write,https://www.googleapis.com/auth/monitoring.write,https://www.googleapis.com/auth/servicecontrol,https://www.googleapis.com/auth/service.management.readonly,https://www.googleapis.com/auth/trace.append \
+    --scopes=--scopes=https://www.googleapis.com/auth/cloud-platform \
     --accelerator=count=1,type=nvidia-tesla-t4 \
     --tags=http-server,https-server \
     --create-disk=auto-delete=yes,boot=yes,device-name="$instance_name",image=projects/ml-images/global/images/c2-deeplearning-pytorch-2-2-cu121-v20240306-debian-11,mode=rw,size=50,type=projects/"$cloud_project"/zones/"$zone_instance"/diskTypes/pd-balanced \

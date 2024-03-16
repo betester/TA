@@ -18,28 +18,14 @@ async def deploy_instance(
     zone: str,
     service_account: str,
     container_env: str,
-    deploy_script_resource: str,
-    after_deploy_script: str
+    machine_type: str = "CPU"
     ):
-
+    
+    deploy_script_resource = "create_cpu_instance.sh" if machine_type == "CPU" else "create_gpu_instance.sh"
     cmd = f"./scripts/{deploy_script_resource} {service_name} {project_name} {zone} {service_account} '{container_env}' {image_name}"
 
     process = await asyncio.create_subprocess_shell(
         cmd,
-        stdin=PIPE,
-        stdout=PIPE,
-        stderr=STDOUT
-    )
-
-    if process.stdout:
-        async for line in process.stdout:
-            print(line.decode('utf-8'))
-
-    if not after_deploy_script:
-        return 
-
-    process = await asyncio.create_subprocess_shell(
-        after_deploy_script,
         stdin=PIPE,
         stdout=PIPE,
         stderr=STDOUT
