@@ -442,7 +442,7 @@ class AutoDeployer(MasterObserver):
                     )
 
                     if machine_deployer is None:
-                        self._logger.error(f"No deploy script for {provider}, deployment cancelled (you might need to set up deloy script on component)")
+                        self._logger.info(f"No deploy script for {provider}, deployment cancelled (you might need to set up deloy script on component)")
                         return False
 
                     deploy_result = await machine_deployer(self._topic_deployment_configs[target_topic])
@@ -483,5 +483,7 @@ class TopicSpikeChecker:
 
         self._logger.info(f"Topic {topic_id} statistics:\nMean: {mean}\nStandard Deviation: {std}\nZ-Score:{z_score}")
         #TODO: put explanation probably whether it's most likely can be deployed or not
+            
+        self._logger.info(f"{z_score < z_threshold}")
         return z_score < z_threshold
 
