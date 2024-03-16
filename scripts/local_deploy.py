@@ -4,36 +4,15 @@ import os
 import time
 import json
 import asyncio
-from asyncio.subprocess import PIPE, STDOUT 
 
 from dotenv import load_dotenv, find_dotenv
+
+from scripts import deploy_instance
+
 
 load_dotenv(find_dotenv())
 
 # this can be used for deploying instance that uses docker image
-async def deploy_instance(
-    project_name: str,
-    service_name: str,
-    image_name: str,
-    zone: str,
-    service_account: str,
-    container_env: str,
-    machine_type: str = "CPU"
-    ):
-    
-    deploy_script_resource = "create_cpu_instance.sh" if machine_type == "CPU" else "create_gpu_instance.sh"
-    cmd = f"./scripts/{deploy_script_resource} {service_name} {project_name} {zone} {service_account} '{container_env}' {image_name}"
-
-    process = await asyncio.create_subprocess_shell(
-        cmd,
-        stdin=PIPE,
-        stdout=PIPE,
-        stderr=STDOUT
-    )
-
-    if process.stdout:
-        async for line in process.stdout:
-            print(line.decode('utf-8'))
 
 def parse_txt(source_file: str):
     cmd = ""
@@ -89,7 +68,6 @@ async def main():
 
             machine_type = extra_config.get("machine_type", "CPU")
             env = config_source
-            used_script = "create_cpu_instance.sh"
             zone = ZONE
 
             if machine_type == "GPU":
