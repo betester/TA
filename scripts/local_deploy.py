@@ -71,7 +71,7 @@ async def main():
         }
     }
 
-    current_config = ["kafka"]
+    current_config = ["analyzer"]
 
     while len(current_config) != 0:
 
@@ -94,7 +94,6 @@ async def main():
 
             if machine_type == "GPU":
                 env = parse_txt(config_source)
-                used_script = "create_gpu_instance.sh"
                 zone = "us-west4-a"
 
             await deploy_instance(
@@ -104,7 +103,7 @@ async def main():
                 zone,
                 SERVICE_ACCOUNT,
                 env,
-                used_script
+                machine_type
             )
         
         wait_time = extra_config.get("wait_time", 0)
