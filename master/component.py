@@ -45,7 +45,9 @@ class MasterComponent:
 
         statistic_worker = StatisticWorker(maximum_seconds=window_max_second)
         topic_spike_checker = TopicSpikeChecker(statistic_worker)
-        deploy_script= DeployScripts()
+        deploy_script = DeployScripts()
+        deploy_script.set_deploy_functions(
+        )
 
         auto_deployer = AutoDeployer(
             deploy_script=deploy_script,

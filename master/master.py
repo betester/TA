@@ -297,7 +297,6 @@ class DeployScripts:
     def __init__(self, log_dir_path: str='logs'):
         self._deploy_functions: dict[CloudProvider, Callable[[TopicDeploymentConfig], Coroutine[Any, Any, DeployResult]]] = {}
         self._deploy_functions[CloudProvider.LOCAL] = self._local_deployment
-        self._deploy_functions[CloudProvider.GOOGLE_CLOUD] = self._gooogle_deployment
         self._log_dir_path = log_dir_path
 
         self._logger = get_logger(name=self.__class__.__name__)
@@ -354,59 +353,6 @@ class DeployScripts:
             return DeployResult(
                 machine_id=str(process.pid),
                 shut_down_machine= kill_process_and_task
-            ) 
-
-        raise Exception("Process cannot be created")
-
-
-    async def _gooogle_deployment(self, configs: TopicDeploymentConfig) -> DeployResult:
-
-        project_name = os.environ.get("PROJECT")
-        assert project_name is not None
-        zone = configs.cloud_deploy_configs.zone
-        assert zone is not None
-        service_account = os.environ.get("SERVICE_ACCOUNT")
-        assert service_account is not None
-
-        config_path = "configs"
-
-        config_source = f"{os.path.join(config_path, configs.service_name)}.txt"
-        config_metadata = f"{os.path.join(config_path, configs.service_name)}.json"
-
-        unique_id = str(uuid4())[:6]
-        service_name = configs.service_name + unique_id
-
-        with open(config_metadata) as f: 
-            metadata = json.load(f) 
-            image_name = metadata['IMAGE']
-
-        process = await asyncio.create_subprocess_shell(
-            cmd,
-            stdin = PIPE,
-            stdout = PIPE, 
-            stderr = STDOUT
-        )
-
-        async def shutdown_google_cloud_instance():
-            shutdown_cmd = f"gcloud compute instance stop {service_name} --zone={zone} --project={project_name}"
-            shutdown_process = await asyncio.create_subprocess_shell(
-                shutdown_cmd,
-                stdin = PIPE,
-                stdout = PIPE, 
-                stderr = STDOUT
-            )
-
-            if shutdown_process.stdout:
-                asyncio.create_task(self._write_deploy_logs(shutdown_process.stdout))
-
-            return True
-
-
-        if process.stdout:
-            asyncio.create_task(self._write_deploy_logs(process.stdout)) 
-            return DeployResult(
-                machine_id=f"{service_name};{project_name};{zone}",
-                shut_down_machine = shutdown_google_cloud_instance
             ) 
 
         raise Exception("Process cannot be created")

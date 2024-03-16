@@ -4,11 +4,8 @@ WORKDIR /app
 COPY master ./master
 COPY fogverse ./fogverse
 COPY requirements/master.txt ./
-COPY scripts ./scripts
 
-USER 1001
-RUN find ./scripts -type f -iname "*.sh" -exec chmod +x {} +
-
+COPY --chmod=755 scripts ./scripts
 RUN pip install -r master.txt
 
 CMD ["python","-m", "master"]
