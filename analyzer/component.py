@@ -51,14 +51,16 @@ class AnalyzerComponent:
         )
         
         topic_deployment_config = TopicDeploymentConfig(
-                project_name=str(get_config("PROJECT_NAME", self, "")),
-                service_name=str(get_config("SERVICE_NAME", self, "")),
-                image_name=str(get_config("IMAGE_NAME", self, "")),
-                zone=str(get_config("ZONE", self, "")),
-                service_account=str(get_config("SERVICE_ACCOUNT", self, "")),
-                image_env=self._container_env,
-                machine_type=self._machine_type,
-                provider=CloudProvider[self._cloud_provider]
+            max_instance=self._max_instance,
+            topic_id=self._producer_topic,
+            project_name=str(get_config("PROJECT_NAME", self, "")),
+            service_name=str(get_config("SERVICE_NAME", self, "")),
+            image_name=str(get_config("IMAGE_NAME", self, "")),
+            zone=str(get_config("ZONE", self, "")),
+            service_account=str(get_config("SERVICE_ACCOUNT", self, "")),
+            image_env=self._container_env,
+            machine_type=self._machine_type,
+            provider=CloudProvider[self._cloud_provider]
             )
 
         analyzer_producer = AnalyzerProducer(
@@ -94,6 +96,8 @@ class AnalyzerComponent:
         )
 
         topic_deployment_config = TopicDeploymentConfig(
+            max_instance=self._max_instance,
+            topic_id=self._producer_topic,
             project_name=str(get_config("PROJECT_NAME", self, "")),
             service_name=str(get_config("SERVICE_NAME", self, "")),
             image_name=str(get_config("IMAGE_NAME", self, "")),

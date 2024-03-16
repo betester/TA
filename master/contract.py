@@ -26,6 +26,7 @@ class CloudProvider(str, Enum):
     GOOGLE_CLOUD = "GOOGLE_CLOUD" 
 
 class TopicDeploymentConfig(BaseModel):
+    topic_id: str
     project_name: str
     service_name: str
     image_name: str

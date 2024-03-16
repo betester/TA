@@ -422,7 +422,7 @@ class AutoDeployer(MasterObserver):
                     self._logger.info(f"Cannot be deployed yet, time remaining: {time_remaining}")
                     return False
             
-                maximum_topic_deployment = self._topic_deployment_configs[target_topic].cloud_deploy_configs.max_instance
+                maximum_topic_deployment = self._topic_deployment_configs[target_topic].max_instance
                 current_deployed_replica = self._topic_total_deployment.get(target_topic, 0)
 
                 if current_deployed_replica >= maximum_topic_deployment:
@@ -435,7 +435,7 @@ class AutoDeployer(MasterObserver):
 
                 if self._should_be_deployed(source_topic, source_total_calls):
                     machine_deployer = self._deploy_scripts.get_deploy_functions(
-                        self._topic_deployment_configs[target_topic].cloud_deploy_configs.provider
+                        self._topic_deployment_configs[target_topic].provider
                     )
                     deploy_result = await machine_deployer(self._topic_deployment_configs[target_topic])
                     self._machine_ids.append(deploy_result)
