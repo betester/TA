@@ -5,17 +5,39 @@ import time
 import json
 import asyncio
 
-from dotenv import load_dotenv, find_dotenv
-
-from scripts import deploy_instance
+from asyncio.subprocess import PIPE, STDOUT 
 
 
-load_dotenv(find_dotenv())
+async def deploy_instance(
+    project_name: str,
+    service_name: str,
+    image_name: str,
+    zone: str,
+    service_account: str,
+    container_env: str,
+    machine_type: str = "CPU"
+    ):
+    
+    deploy_script_resource = "create_cpu_instance.sh" if machine_type == "CPU" else "create_gpu_instance.sh"
+    cmd = f"./scripts/{deploy_script_resource} {service_name} {project_name} {zone} {service_account} '{container_env}' {image_name}"
+
+    process = await asyncio.create_subprocess_shell(
+        cmd,
+        stdin=PIPE,
+        stdout=PIPE,
+        stderr=STDOUT
+    )
+
+    if process.stdout:
+        async for line in process.stdout:
+            print(line.decode('utf-8'))
+
 
 # this can be used for deploying instance that uses docker image
 
 def parse_txt(source_file: str):
     cmd = ""
+
     with open(source_file) as f:
         for content in f:
             no_newline = content.rstrip('\n')
@@ -25,8 +47,12 @@ def parse_txt(source_file: str):
 
 async def main():
     # relative towards the project change this if you run it from not from the root project 
-    config_path = "configs" 
 
+
+    from dotenv import load_dotenv, find_dotenv
+    load_dotenv(find_dotenv())
+
+    config_path = "configs" 
     PROJECT = os.environ.get("PROJECT")
     assert PROJECT is not None
     ZONE = os.environ.get("ZONE")
@@ -50,7 +76,7 @@ async def main():
         }
     }
 
-    current_config = ["analyzer"]
+    current_config = ["kafka"]
 
     while len(current_config) != 0:
 
@@ -73,6 +99,12 @@ async def main():
             if machine_type == "GPU":
                 env = parse_txt(config_source)
                 zone = "us-west4-a"
+
+                env += f" -e PROJECT_NAME={PROJECT}"
+                env += f" -e SERVICE_NAME={config_name}"
+                env += f" -e IMAGE_NAME={image_name}"
+                env += f" -e ZONE={zone}"
+                env += f" -e SERVICE_ACCOUNT={SERVICE_ACCOUNT}"
 
             await deploy_instance(
                 PROJECT,

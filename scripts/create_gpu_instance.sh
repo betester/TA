@@ -29,7 +29,7 @@ gcloud compute instances create "$instance_name" \
 
 echo "Running docker instance"
 
-echo "Wait for 3 minutes for the instance done setting up"
-sleep 180
+echo "Wait for 2 minutes for the instance done setting up"
+sleep 120
 
 gcloud compute ssh "$instance_name" --project="$cloud_project" --zone="$zone_instance" --command="docker run --gpus all --restart unless-stopped $docker_env -d $image"
