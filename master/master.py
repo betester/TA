@@ -22,7 +22,6 @@ from confluent_kafka import Consumer, KafkaException, Message, TopicCollection
 from fogverse.fogverse_logging import get_logger
 from fogverse.util import get_timestamp
 from master.contract import (
-    CloudProvider,
     DeployResult, 
     InputOutputThroughputPair, 
     MachineConditionData, 
@@ -295,16 +294,16 @@ class ProducerObserver:
 class DeployScripts:
 
     def __init__(self, log_dir_path: str='logs'):
-        self._deploy_functions: dict[CloudProvider, Callable[[TopicDeploymentConfig], Coroutine[Any, Any, DeployResult]]] = {}
-        self._deploy_functions[CloudProvider.LOCAL] = self._local_deployment
+        self._deploy_functions: dict[str, Callable[[TopicDeploymentConfig], Coroutine[Any, Any, DeployResult]]] = {}
+        self._deploy_functions["LOCAL"] = self._local_deployment
         self._log_dir_path = log_dir_path
 
         self._logger = get_logger(name=self.__class__.__name__)
 
-    def get_deploy_functions(self, cloud_provider: CloudProvider):
+    def get_deploy_functions(self, cloud_provider: str):
         return self._deploy_functions[cloud_provider]
 
-    def set_deploy_functions(self, cloud_provider: CloudProvider, deploy_function: Callable[[TopicDeploymentConfig], Coroutine[Any, Any, DeployResult]]):
+    def set_deploy_functions(self, cloud_provider: str, deploy_function: Callable[[TopicDeploymentConfig], Coroutine[Any, Any, DeployResult]]):
         self._deploy_functions[cloud_provider] = deploy_function
     
     async def write_deployed_service_logs(self, file_name: str, stdout: StreamReader):
@@ -425,22 +424,37 @@ class AutoDeployer(MasterObserver):
                 maximum_topic_deployment = self._topic_deployment_configs[target_topic].max_instance
                 current_deployed_replica = self._topic_total_deployment.get(target_topic, 0)
 
+                service_name = self._topic_deployment_configs[target_topic].service_name
+                provider = self._topic_deployment_configs[target_topic].provider
+
                 if current_deployed_replica >= maximum_topic_deployment:
                     self._logger.info(
-                        f"Cannot deploy service {self._topic_deployment_configs[target_topic].service_name} exceeds maximum limit.\n" 
+                        f"Cannot deploy service {service_name} exceeds maximum limit.\n" 
                         f"current deployed : {current_deployed_replica}\n"
                         f"maximum replica : {maximum_topic_deployment}"
                     )
                     return False
 
                 if self._should_be_deployed(source_topic, source_total_calls):
+                    self._logger.info(f"Deploying new machine for service {service_name}")
                     machine_deployer = self._deploy_scripts.get_deploy_functions(
                         self._topic_deployment_configs[target_topic].provider
                     )
+
+                    if machine_deployer is None:
+                        self._logger.error(f"No deploy script for {provider}, deployment cancelled (you might need to set up deloy script on component)")
+                        return False
+
                     deploy_result = await machine_deployer(self._topic_deployment_configs[target_topic])
+                        
+                    if not deploy_result:
+                        self._logger.error(f"Deployment failed for service {service_name}")
+                        return False
+
                     self._machine_ids.append(deploy_result)
                     self._can_deploy_topic[target_topic].can_be_deployed = False
                     self._can_deploy_topic[target_topic].deployed_timestamp = get_timestamp()
+                    self._topic_total_deployment[target_topic] += 1
                     asyncio.create_task(self.delay_deploy(target_topic))
                     return True
             
@@ -448,7 +462,7 @@ class AutoDeployer(MasterObserver):
                 return False
 
         except Exception as e:
-            self._logger.info(e)
+            self._logger.error(e)
             return False
     
     async def stop(self):

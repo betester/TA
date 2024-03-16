@@ -4,7 +4,6 @@ import asyncio
 from asyncio.locks import Lock
 from collections.abc import Callable, Coroutine
 from datetime import datetime
-from enum import Enum
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict
@@ -20,10 +19,6 @@ class MachineConditionData(BaseModel):
     target_topic: str
     timestamp: int
     total_messages: int
-    
-class CloudProvider(str, Enum):
-    LOCAL = "LOCAL"
-    GOOGLE_CLOUD = "GOOGLE_CLOUD" 
 
 class TopicDeploymentConfig(BaseModel):
     max_instance: int
@@ -35,7 +30,7 @@ class TopicDeploymentConfig(BaseModel):
     service_account: str
     image_env: dict 
     machine_type: str
-    provider: CloudProvider
+    provider: str
 
 #TODO: rename this into something else
 class InputOutputThroughputPair(BaseModel):

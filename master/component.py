@@ -1,7 +1,7 @@
 
 from uuid import uuid4
 from fogverse.util import get_config
-from master.contract import CloudProvider, DeployResult, TopicDeploymentConfig
+from master.contract import DeployResult, TopicDeploymentConfig
 from master.event_handler import Master
 from master.master import AutoDeployer, ConsumerAutoScaler, DeployScripts, ProducerObserver, TopicSpikeChecker
 from confluent_kafka.admin import AdminClient
@@ -86,7 +86,7 @@ class MasterComponent:
         deploy_script = DeployScripts()
 
         deploy_script.set_deploy_functions(
-            CloudProvider["GOOGLE_CLOUD"],
+            "GOOGLE_CLOUD",
             self.google_deployment
         )
 

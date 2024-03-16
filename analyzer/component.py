@@ -5,7 +5,7 @@ from analyzer.processor import AnalyzerProcessor
 from fogverse.consumer_producer import ConfluentConsumer, ConfluentProducer
 from fogverse.general import ParallelRunnable
 from fogverse.util import get_config
-from master.contract import CloudProvider, TopicDeploymentConfig
+from master.contract import TopicDeploymentConfig
 from master.master import ConsumerAutoScaler, ProducerObserver
 from .analyzer import DisasterAnalyzerImpl
 from .handler import AnalyzerProducer, ParallelAnalyzerJobService
@@ -60,7 +60,7 @@ class AnalyzerComponent:
             service_account=str(get_config("SERVICE_ACCOUNT", self, "")),
             image_env=self._container_env,
             machine_type=self._machine_type,
-            provider=CloudProvider[self._cloud_provider]
+            provider=self._cloud_provider
             )
 
         analyzer_producer = AnalyzerProducer(
@@ -105,7 +105,7 @@ class AnalyzerComponent:
             service_account=str(get_config("SERVICE_ACCOUNT", self, "")),
             image_env=self._container_env,
             machine_type=self._machine_type,
-            provider=CloudProvider[self._cloud_provider]
+            provider=self._cloud_provider
         )
 
         start_producer_callback = functools.partial(
