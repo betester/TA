@@ -47,13 +47,6 @@ services:
     environment:
       - KAFKA_ADMIN_HOST=kafka_broker
       - ANALYZER_CONSUMER_SERVERS=kafka_broker:9092 
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
   kafka_broker:
     image: docker.io/bitnami/kafka:3.6
     networks:
