@@ -380,35 +380,6 @@ class DeployScripts:
             metadata = json.load(f) 
             image_name = metadata['IMAGE']
 
-
-        cmd = (
-            f"gcloud compute instances create-with-container {service_name} "
-                f"--project={project_name} "
-                f"--zone={zone} "
-                f"--container-image={image_name} "
-                "--machine-type=n1-standard-2 "
-                "--network-interface=network-tier=PREMIUM,subnet=default "
-                "--maintenance-policy=TERMINATE "
-                "--provisioning-model=STANDARD "
-                f"--service-account={service_account} "
-                "--scopes=https://www.googleapis.com/auth/devstorage.read_only,https://www.googleapis.com/auth/logging.write,https://www.googleapis.com/auth/monitoring.write,https://www.googleapis.com/auth/servicecontrol,https://www.googleapis.com/auth/service.management.readonly,https://www.googleapis.com/auth/trace.append "
-                "--accelerator=count=1,type=nvidia-tesla-t4"
-                "--tags=http-server,https-server "
-                "--image=projects/ml-images/global/images/c2-deeplearning-pytorch-2-2-cu121-v20240306-debian-11 "
-                "--boot-disk-size=50GB "
-                "--boot-disk-type=pd-balanced "
-                f"--boot-disk-device-name={service_name} "
-                "--container-restart-policy=always "
-                f"--container-env-file={config_source} "
-        )
-
-        cmd += (
-            "--no-shielded-secure-boot "
-            "--shielded-vtpm "
-            "--shielded-integrity-monitoring "
-            "--labels=goog-ec-src=vm_add-gcloud,container-vm=cos-stable-109-17800-147-28"
-        )
-
         process = await asyncio.create_subprocess_shell(
             cmd,
             stdin = PIPE,

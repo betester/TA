@@ -7,7 +7,6 @@ service_account="$4"
 docker_env="$5"
 image="$6"
 
-# create the instance first
 gcloud compute instances create "$instance_name" \
     --project="$cloud_project" \
     --zone="$zone_instance" \
@@ -24,7 +23,11 @@ gcloud compute instances create "$instance_name" \
     --shielded-vtpm \
     --shielded-integrity-monitoring \
     --labels=goog-ec-src=vm_add-gcloud \
+    --metadata=startup-script='sudo /opt/deeplearning/install-driver.sh' \
     --reservation-affinity=any
 
-# upon creating, you first need to install nvidia driver again, this step will do that for you automatically
-echo y | gcloud compute ssh "$instance_name" --project="$cloud_project" --zone="$zone_instance" --command="docker run $docker_env -d $image"
+echo "Waiting 90 seconds for the instance done the set up"
+sleep 90
+
+echo "Running docker instance"
+gcloud compute ssh "$instance_name" --project="$cloud_project" --zone="$zone_instance" --command="docker run --gpus all --restart unless-stopped $docker_env -d $image"

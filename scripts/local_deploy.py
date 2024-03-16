@@ -17,10 +17,12 @@ async def deploy_instance(
     image_name: str,
     zone: str,
     service_account: str,
-    container_env: str
+    container_env: str,
+    deploy_script_resource: str,
+    after_deploy_script: str
     ):
 
-    cmd = f"./scripts/create_gpu_instance.sh {service_name} {project_name} {zone} {service_account} {container_env} {image_name}"
+    cmd = f"./scripts/{deploy_script_resource} {service_name} {project_name} {zone} {service_account} '{container_env}' {image_name}"
 
     process = await asyncio.create_subprocess_shell(
         cmd,
@@ -33,6 +35,19 @@ async def deploy_instance(
         async for line in process.stdout:
             print(line.decode('utf-8'))
 
+    if not after_deploy_script:
+        return 
+
+    process = await asyncio.create_subprocess_shell(
+        after_deploy_script,
+        stdin=PIPE,
+        stdout=PIPE,
+        stderr=STDOUT
+    )
+
+    if process.stdout:
+        async for line in process.stdout:
+            print(line.decode('utf-8'))
 
 def parse_txt(source_file: str):
     cmd = ""
@@ -64,7 +79,9 @@ async def main():
             "wait_time": 5
         },
         "analyzer": {
-            "machine_type" : "GPU"
+            "machine_type" : "GPU",
+            "after_deploy_script": "./scripts/run_docker_gpu.sh"
+
         }
     }
 
@@ -72,7 +89,7 @@ async def main():
 
     while len(current_config) != 0:
 
-        config_name = current_config.pop(-1)
+        config_name = current_config.pop()
 
         print(f"Deploying {config_name} service")
 
@@ -84,20 +101,24 @@ async def main():
             image_name = metadata['IMAGE']
             extra_config = configs.get(config_name, {})
 
-            machine_type = extra_config.get(machine_type, "CPU")
+            machine_type = extra_config.get("machine_type", "CPU")
             env = config_source
+            used_script = "create_cpu_instance.sh"
+            zone = ZONE
 
             if machine_type == "GPU":
                 env = parse_txt(config_source)
-
+                used_script = "create_gpu_instance.sh"
+                zone = "us-west4-a"
 
             await deploy_instance(
                 PROJECT,
                 config_name,
                 image_name,
-                ZONE,
+                zone,
                 SERVICE_ACCOUNT,
-                env
+                env,
+                used_script
             )
         
         wait_time = extra_config.get("wait_time", 0)
