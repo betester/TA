@@ -1,5 +1,4 @@
 from typing import Optional
-
 from aiokafka.conn import functools
 from analyzer.processor import AnalyzerProcessor
 from fogverse.consumer_producer import ConfluentConsumer, ConfluentProducer
@@ -19,11 +18,12 @@ class AnalyzerComponent:
         self._consumer_servers = str(get_config("ANALYZER_CONSUMER_SERVERS", self, "localhost:9092"))
         self._consumer_group_id = str(get_config("ANALYZER_CONSUMER_GROUP_ID", self, "analyzer_v2"))
         # assigns based on the attribute and model source
-        self._disaster_classifier_model_source = ("is_disaster", str(get_config("DISASTER_CLASSIFIER_MODEL_SOURCE", self, "./mocking_bird")))
-        self._keyword_classifier_model_source = ("keyword", str(get_config("KEYWORD_CLASSIFIER_MODEL_SOURCE", self, "./jay_bird")))
+        self._disaster_classifier_model_source = ("is_disaster", str(get_config("DISASTER_CLASSIFIER_MODEL_SOURCE", self, "betester/mocking_bird")))
+        self._keyword_classifier_model_source = ("keyword", str(get_config("KEYWORD_CLASSIFIER_MODEL_SOURCE", self, "betester/jay_bird")))
 
         # cloud configs 
-        self._cloud_provider = str(get_config("CLOUD_PROVIDER", self, "LOCAL"))
+        self._cloud_provider = str(get_config("CLOUD_PROVIDER", self, "GOOGLE_CLOUD"))
+        self._cloud_zone = str(get_config("CLOUD_ZONE", self, "us-west4-a"))
         self._max_instance = int(str(get_config("MAX_INSTANCE", self, "4")))
         self._machine_type = str(get_config("MACHINE_TYPE", self, "GPU"))
 
@@ -31,14 +31,14 @@ class AnalyzerComponent:
             "MACHINE_TYPE": self._machine_type,
             "MAX_INSTANCE": self._max_instance,
             "CLOUD_PROVIDER": self._cloud_provider,
-            "keyword": self._keyword_classifier_model_source,
-            "is_disaster": self._disaster_classifier_model_source,
+            "KEYWORD_CLASSIFIER_MODEL_SOURCE": self._keyword_classifier_model_source[1],
+            "DISASTER_CLASSIFIER_MODEL_SOURCE": self._disaster_classifier_model_source[1],
             "ANALYZER_CONSUMER_GROUP_ID": self._consumer_group_id,
             "ANALYZER_CONSUMER_SERVERS": self._consumer_servers,
             "ANALYZER_CONSUMER_TOPIC": self._consumer_topic,
             "ANALYZER_PRODUCER_SERVERS": self._producer_servers,
             "ANALYZER_PRODUCER_TOPIC": self._producer_topic,
-
+            "CLOUD_ZONE": self._cloud_zone
         }
 
 
@@ -53,15 +53,15 @@ class AnalyzerComponent:
         topic_deployment_config = TopicDeploymentConfig(
             max_instance=self._max_instance,
             topic_id=self._producer_topic,
-            project_name=str(get_config("PROJECT_NAME", self, "")),
-            service_name=str(get_config("SERVICE_NAME", self, "")),
-            image_name=str(get_config("IMAGE_NAME", self, "")),
-            zone=str(get_config("ZONE", self, "")),
-            service_account=str(get_config("SERVICE_ACCOUNT", self, "")),
+            project_name=str(get_config("PROJECT_NAME", self, "personal-project-408003")),
+            service_name=str(get_config("SERVICE_NAME", self, "analyzer")),
+            image_name=str(get_config("IMAGE_NAME", self, "betester/analyzer:latest")),
+            zone=self._cloud_zone,
+            service_account=str(get_config("SERVICE_ACCOUNT", self, "877295035922-compute@developer.gserviceaccount.com")),
             image_env=self._container_env,
             machine_type=self._machine_type,
             provider=self._cloud_provider
-            )
+        )
 
         analyzer_producer = AnalyzerProducer(
             producer_topic=self._producer_topic,
@@ -98,11 +98,11 @@ class AnalyzerComponent:
         topic_deployment_config = TopicDeploymentConfig(
             max_instance=self._max_instance,
             topic_id=self._producer_topic,
-            project_name=str(get_config("PROJECT_NAME", self, "")),
-            service_name=str(get_config("SERVICE_NAME", self, "")),
-            image_name=str(get_config("IMAGE_NAME", self, "")),
-            zone=str(get_config("ZONE", self, "")),
-            service_account=str(get_config("SERVICE_ACCOUNT", self, "")),
+            project_name=str(get_config("PROJECT_NAME", self, "personal-project-408003")),
+            service_name=str(get_config("SERVICE_NAME", self, "analyzer")),
+            image_name=str(get_config("IMAGE_NAME", self, "betester/analyzer:latest")),
+            zone=self._cloud_zone,
+            service_account=str(get_config("SERVICE_ACCOUNT", self, "877295035922-compute@developer.gserviceaccount.com")),
             image_env=self._container_env,
             machine_type=self._machine_type,
             provider=self._cloud_provider

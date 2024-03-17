@@ -409,7 +409,6 @@ class AutoDeployer(MasterObserver):
     
     async def deploy(self, source_topic: str, source_total_calls: float, target_topic: str) -> bool:
         try:
-            
             if target_topic not in self._can_deploy_topic:
                 self._logger.info(f"Topic {target_topic} does not exist, might be not sending heartbeat during initial start or does not have deployment configs")
                 return False
@@ -449,7 +448,7 @@ class AutoDeployer(MasterObserver):
                     self._logger.info("Starting deployment script")
                     starting_time = get_timestamp()
                     deploy_result = await machine_deployer(self._topic_deployment_configs[target_topic])
-                    self._logger.info(f"Deployment finished, time taken: {starting_time - get_timestamp()}")
+                    self._logger.info(f"Deployment finished, time taken: {get_timestamp() - starting_time}")
                         
                     if not deploy_result:
                         self._logger.error(f"Deployment failed for service {service_name}")
