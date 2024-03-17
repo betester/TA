@@ -20,7 +20,7 @@ gcloud compute instances create-with-container ${service_name} \
     --scopes=https://www.googleapis.com/auth/cloud-platform \
     --tags=http-server,https-server \
     --image=projects/cos-cloud/global/images/cos-stable-109-17800-147-28 \
-    --boot-disk-size=10GB \
+    --boot-disk-size=20GB \
     --boot-disk-type=pd-balanced \
     --boot-disk-device-name=${service_name} \
     --container-restart-policy=always \

@@ -457,7 +457,7 @@ class AutoDeployer(MasterObserver):
                     self._machine_ids.append(deploy_result)
                     self._can_deploy_topic[target_topic].can_be_deployed = False
                     self._can_deploy_topic[target_topic].deployed_timestamp = get_timestamp()
-                    self._topic_total_deployment[target_topic] += 1
+                    self._topic_total_deployment[target_topic] = current_deployed_replica + 1
                     asyncio.create_task(self.delay_deploy(target_topic))
                     return True
             

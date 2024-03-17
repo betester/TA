@@ -1,5 +1,22 @@
 FROM python:3.10
 
+# Install required dependencies
+RUN apt-get update && apt-get install -y \
+    curl \
+    gnupg
+
+# Add Google Cloud SDK distribution URI as a package source
+RUN echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" \
+    | tee -a /etc/apt/sources.list.d/google-cloud-sdk.list
+
+# Import the Google Cloud public key
+RUN curl https://packages.cloud.google.com/apt/doc/apt-key.gpg \
+    | apt-key --keyring /usr/share/keyrings/cloud.google.gpg add -
+
+# Install Google Cloud SDK
+RUN apt-get update && apt-get install -y \
+    google-cloud-sdk
+
 WORKDIR /app
 COPY master ./master
 COPY fogverse ./fogverse
@@ -8,4 +25,4 @@ COPY --chmod=755 scripts ./scripts
 
 RUN pip install -r master.txt
 
-CMD ["python","-m", "master"]
+ENTRYPOINT ["/scripts/master_entrypoint.sh"]

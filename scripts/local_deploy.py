@@ -53,6 +53,7 @@ async def main():
     load_dotenv(find_dotenv())
 
     config_path = "configs" 
+
     PROJECT = os.environ.get("PROJECT")
     assert PROJECT is not None
     ZONE = os.environ.get("ZONE")
@@ -68,15 +69,10 @@ async def main():
         "master" : {
             "next_config": ["crawler", "analyzer"],
             "wait_time": 5
-        },
-        "analyzer": {
-            "machine_type" : "GPU",
-            "after_deploy_script": "./scripts/run_docker_gpu.sh"
-
         }
     }
 
-    current_config = ["kafka"]
+    current_config = ["analyzer"]
 
     while len(current_config) != 0:
 
@@ -86,6 +82,7 @@ async def main():
 
         config_source = f"{os.path.join(config_path, config_name)}.txt"
         config_metadata = f"{os.path.join(config_path, config_name)}.json"
+
 
         with open(config_metadata) as f:
             metadata = json.load(f) 
