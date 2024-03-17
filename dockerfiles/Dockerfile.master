@@ -25,4 +25,4 @@ COPY --chmod=755 scripts ./scripts
 
 RUN pip install -r master.txt
 
-ENTRYPOINT ["/scripts/master_entrypoint.sh"]
+ENTRYPOINT ["./scripts/master_entrypoint.sh"]
