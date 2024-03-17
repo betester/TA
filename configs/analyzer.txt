@@ -5,7 +5,6 @@ ANALYZER_PRODUCER_SERVERS=kafka.asia-southeast1-b.c.personal-project-408003.inte
 ANALYZER_CONSUMER_TOPIC=analyze
 ANALYZER_CONSUMER_SERVERS=kafka.asia-southeast1-b.c.personal-project-408003.internal:9092
 ANALYZER_CONSUMER_GROUP_ID=analyzer
-ZONE=us-west4-a
 CLOUD_PROVIDER=GOOGLE_CLOUD
 DISASTER_CLASSIFIER_MODEL_SOURCE=betester/mocking_bird
 KEYWORD_CLASSIFIER_MODEL_SOURCE=betester/jay_bird

@@ -103,7 +103,7 @@ async def main():
                 env += f" -e PROJECT_NAME={PROJECT}"
                 env += f" -e SERVICE_NAME={config_name}"
                 env += f" -e IMAGE_NAME={image_name}"
-                env += f" -e ZONE={zone}"
+                env += f" -e CLOUD_ZONE={zone}"
                 env += f" -e SERVICE_ACCOUNT={SERVICE_ACCOUNT}"
 
             await deploy_instance(
