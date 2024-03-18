@@ -447,7 +447,7 @@ class AutoDeployer(MasterObserver):
 
                     self._logger.info("Starting deployment script")
                     starting_time = get_timestamp()
-                    deploy_result = await machine_deployer(self._topic_deployment_configs[target_topic])
+                    deploy_result = await machine_deployer(self._topic_deployment_configs[target_topic], self._logger)
                     self._logger.info(f"Deployment finished, time taken: {get_timestamp() - starting_time}")
                         
                     if not deploy_result:
