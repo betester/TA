@@ -23,5 +23,5 @@ gcloud compute instances create "$instance_name" \
     --shielded-vtpm \
     --shielded-integrity-monitoring \
     --labels=goog-ec-src=vm_add-gcloud \
-    --metadata=startup-script='sudo /opt/deeplearning/install-driver.sh && docker run --gpus all --restart unless-stopped '"$docker_env"' -d '"$image"'' \
+    --metadata=startup-script='sudo /opt/deeplearning/install-driver.sh' \
     --reservation-affinity=any

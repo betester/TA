@@ -44,10 +44,25 @@ class MasterComponent:
 
         return docker_container_env
 
+    def parse_dict_to_txt_env(self, container_env: dict, machine_id : str):
+        
+        config_file_name = f"{machine_id}.txt" 
+
+        with open(config_file_name, "w") as f:
+            for key, val in container_env.items():
+                f.write(f"{key}={val}\n")
+
+        return config_file_name
+
+
     async def google_deployment(self, topic_deployment_config: TopicDeploymentConfig, logger: Logger) -> DeployResult:
         
         random_unique_id = uuid4()
         machine_id = f"{topic_deployment_config.service_name}{random_unique_id}"
+        machine_type = topic_deployment_config.machine_type
+        image_env = topic_deployment_config.image_env
+        
+        container_env = self.parse_dict_to_txt_env(image_env, machine_id) if  machine_type == 'CPU' else self.parse_dict_to_docker_env(image_env)
 
         logger.info(f"Deploying google instance with id : {machine_id}")
 
