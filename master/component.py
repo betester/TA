@@ -72,7 +72,7 @@ class MasterComponent:
             topic_deployment_config.image_name,
             topic_deployment_config.zone,
             topic_deployment_config.service_account,
-            self.parse_dict_to_docker_env(topic_deployment_config.image_env),
+            container_env,
             topic_deployment_config.machine_type
         )
 
