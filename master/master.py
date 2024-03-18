@@ -1,10 +1,10 @@
 from asyncio import StreamReader, Task
 
 import os
-import json
 import time
 from uuid import uuid4
 
+from logging import Logger
 from collections.abc import Callable, Coroutine
 from typing import Any, Optional
 from aiokafka.client import asyncio
@@ -294,7 +294,7 @@ class ProducerObserver:
 class DeployScripts:
 
     def __init__(self, log_dir_path: str='logs'):
-        self._deploy_functions: dict[str, Callable[[TopicDeploymentConfig], Coroutine[Any, Any, DeployResult]]] = {}
+        self._deploy_functions: dict[str, Callable[[TopicDeploymentConfig, Logger], Coroutine[Any, Any, DeployResult]]] = {}
         self._deploy_functions["LOCAL"] = self._local_deployment
         self._log_dir_path = log_dir_path
 
@@ -303,7 +303,7 @@ class DeployScripts:
     def get_deploy_functions(self, cloud_provider: str):
         return self._deploy_functions[cloud_provider]
 
-    def set_deploy_functions(self, cloud_provider: str, deploy_function: Callable[[TopicDeploymentConfig], Coroutine[Any, Any, DeployResult]]):
+    def set_deploy_functions(self, cloud_provider: str, deploy_function: Callable[[TopicDeploymentConfig, Logger], Coroutine[Any, Any, DeployResult]]):
         self._deploy_functions[cloud_provider] = deploy_function
     
     async def write_deployed_service_logs(self, file_name: str, stdout: StreamReader):

@@ -1,5 +1,6 @@
 
 from uuid import uuid4
+from logging import Logger
 from fogverse.util import get_config
 from master.contract import DeployResult, TopicDeploymentConfig
 from master.event_handler import Master
@@ -8,7 +9,7 @@ from confluent_kafka.admin import AdminClient
 from functools import partial
 
 from master.worker import InputOutputRatioWorker, StatisticWorker
-from scripts.local_deploy import deploy_instance
+from scripts.local_deploy import deploy_instance_with_process
 
 
 
@@ -43,14 +44,14 @@ class MasterComponent:
 
         return docker_container_env
 
-    async def google_deployment(self, topic_deployment_config: TopicDeploymentConfig) -> DeployResult:
+    async def google_deployment(self, topic_deployment_config: TopicDeploymentConfig, logger: Logger) -> DeployResult:
         
         random_unique_id = uuid4()
         machine_id = f"{topic_deployment_config.service_name}{random_unique_id}"
 
-        print(f"Deploying google instance with id : {machine_id}")
+        logger.info(f"Deploying google instance with id : {machine_id}")
 
-        await deploy_instance(
+        process = await deploy_instance_with_process(
             topic_deployment_config.project_name,
             machine_id,
             topic_deployment_config.image_name,
@@ -60,8 +61,13 @@ class MasterComponent:
             topic_deployment_config.machine_type
         )
 
+
+        if process.stdout:
+            async for line in process.stdout:
+                logger.info(line.decode('utf-8'))
+
         async def shutdown_google_cloud_instance():
-            print("Not implemented yet")
+            logger.info("Not implemented yet")
             return True
         
         

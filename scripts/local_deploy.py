@@ -8,6 +8,29 @@ import asyncio
 from asyncio.subprocess import PIPE, STDOUT 
 
 
+async def deploy_instance_with_process(
+    project_name: str,
+    service_name: str,
+    image_name: str,
+    zone: str,
+    service_account: str,
+    container_env: str,
+    machine_type: str = "CPU"
+    ):
+    
+    deploy_script_resource = "create_cpu_instance.sh" if machine_type == "CPU" else "create_gpu_instance.sh"
+    cmd = f"./scripts/{deploy_script_resource} {service_name} {project_name} {zone} {service_account} '{container_env}' {image_name}"
+
+    process = await asyncio.create_subprocess_shell(
+        cmd,
+        stdin=PIPE,
+        stdout=PIPE,
+        stderr=STDOUT
+    )
+
+    return process
+
+
 async def deploy_instance(
     project_name: str,
     service_name: str,
@@ -72,7 +95,7 @@ async def main():
         },
     }
 
-    current_config = ["analyzer", "crawler"]
+    current_config = ["kafka"]
 
     while len(current_config) != 0:
 
@@ -92,16 +115,6 @@ async def main():
             machine_type = extra_config.get("machine_type", "CPU")
             env = config_source
             zone = ZONE
-
-            if machine_type == "GPU":
-                env = parse_txt(config_source)
-                zone = "us-west4-a"
-
-                env += f" -e PROJECT_NAME={PROJECT}"
-                env += f" -e SERVICE_NAME={config_name}"
-                env += f" -e IMAGE_NAME={image_name}"
-                env += f" -e CLOUD_ZONE={zone}"
-                env += f" -e SERVICE_ACCOUNT={SERVICE_ACCOUNT}"
 
             await deploy_instance(
                 PROJECT,
