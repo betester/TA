@@ -65,10 +65,14 @@ async def main():
         "kafka" : {
             "next_config": ["master"],
             "wait_time": 10
-        }
+        },
+        "master" : {
+            "next_config": ["crawler", "analyzer"],
+            "wait_time": 10
+        },
     }
 
-    current_config = ["master"]
+    current_config = ["analyzer", "crawler"]
 
     while len(current_config) != 0:
 

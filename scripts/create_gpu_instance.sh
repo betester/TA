@@ -23,13 +23,5 @@ gcloud compute instances create "$instance_name" \
     --shielded-vtpm \
     --shielded-integrity-monitoring \
     --labels=goog-ec-src=vm_add-gcloud \
-    --metadata=startup-script='sudo /opt/deeplearning/install-driver.sh' \
+    --metadata=startup-script='sudo /opt/deeplearning/install-driver.sh && docker run --gpus all --restart unless-stopped '"$docker_env"' -d '"$image"'' \
     --reservation-affinity=any
-
-
-echo "Running docker instance"
-
-echo "Wait for 2 minutes for the instance done setting up"
-sleep 120
-
-gcloud compute ssh "$instance_name" --project="$cloud_project" --zone="$zone_instance" --command="docker run --gpus all --restart unless-stopped $docker_env -d $image"
