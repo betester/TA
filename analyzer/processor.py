@@ -1,6 +1,6 @@
 from confluent_kafka import Message
-from analyzer.contract import DisasterAnalyzer, DisasterAnalyzerResponse
-from crawler.contract import CrawlerResponse
+from model.analyzer_contract import DisasterAnalyzer, DisasterAnalyzerResponse
+from model.crawler_contract import CrawlerResponse
 from fogverse.base import Processor
 from fogverse.fogverse_logging import get_logger
 
