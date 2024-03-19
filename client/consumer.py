@@ -11,7 +11,7 @@ class NotificationConsumer(Consumer):
     def __init__(self, notification_client: NotificationClient):
         self.consumer_topic = str(get_config("NOTIF_CONSUMER_TOPIC", self, "client_v6"))
         self.consumer_servers = str(get_config("NOTIF_CONSUMER_SERVERS", self, "localhost:9092"))
-        self.group_id = str(get_config("DISCORD_CONSUMER_GROUP_ID", self, "consumer"))
+        self.group_id = str(get_config("NOTIF_CONSUMER_GROUP_ID", self, "consumer"))
         self._closed = False
         self.__client = notification_client
         self.__log = get_logger(name=self.__class__.__name__)

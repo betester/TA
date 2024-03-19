@@ -1,6 +1,6 @@
 import asyncio
 from fogverse import Producer, Profiling
-from crawler import CrawlerResponse
+from model.crawler_contract import CrawlerResponse
 from fogverse.util import get_config
 
 

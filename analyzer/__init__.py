@@ -1,2 +1,2 @@
-from ..model.analyzer_contract import DisasterAnalyzer, DisasterAnalyzerResponse
-from .component import AnalyzerComponent
+from model.analyzer_contract import DisasterAnalyzer, DisasterAnalyzerResponse
+from analyzer.component import AnalyzerComponent

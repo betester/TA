@@ -1,0 +1,3 @@
+NOTIF_CONSUMER_SERVERS=kafka.asia-southeast1-b.c.personal-project-408003.internal:9092
+NOTIF_CONSUMER_GROUP_ID=crawler
+NOTIF_CONSUMER_TOPIC=client

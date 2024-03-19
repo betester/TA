@@ -1,5 +1,5 @@
 
-from ..model.analyzer_contract import DisasterAnalyzer
+from model.analyzer_contract import DisasterAnalyzer
 from typing import Optional, Tuple
 from transformers import BertTokenizer, BertForSequenceClassification
 

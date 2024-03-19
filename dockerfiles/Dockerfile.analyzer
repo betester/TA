@@ -5,6 +5,7 @@ COPY analyzer ./analyzer
 COPY master ./master
 COPY fogverse ./fogverse
 COPY crawler ./crawler
+COPY model ./model
 COPY mocking_bird ./mocking_bird
 COPY jay_bird ./jay_bird
 COPY requirements/analyzer.txt ./
