@@ -52,7 +52,7 @@ class MasterComponent:
             for key, val in container_env.items():
                 f.write(f"{key}={val}\n")
 
-        return config_file_name
+        return f"./{config_file_name}"
 
 
     async def google_deployment(self, topic_deployment_config: TopicDeploymentConfig, logger: Logger) -> DeployResult:
