@@ -49,11 +49,11 @@ class MasterComponent:
         
         config_file_name = f"{machine_id}.txt" 
 
-        with open(config_file_name, "w") as f:
+        with open(config_file_name, "w+") as f:
             for key, val in container_env.items():
                 f.write(f"{key}={val}\n")
 
-        chmod(config_file_name, 0o755)
+        chmod(config_file_name, 0o777)
 
         return f"./{config_file_name}"
 
