@@ -26,6 +26,11 @@ class AnalyzerComponent:
         self._cloud_zone = str(get_config("CLOUD_ZONE", self, "us-west4-a"))
         self._max_instance = int(str(get_config("MAX_INSTANCE", self, "4")))
         self._machine_type = str(get_config("MACHINE_TYPE", self, "GPU"))
+        self._project_name = str(get_config("PROJECT_NAME", self, "personal-project-408003")) 
+        self._service_name = str(get_config("SERVICE_NAME", self, "analyzer"))
+        self._image_name = str(get_config("IMAGE_NAME", self, "betester/analyzer:latest"))
+        self._service_account = str(get_config("SERVICE_ACCOUNT", self, "877295035922-compute@developer.gserviceaccount.com"))
+        self._kafka_admin_account = str(get_config("KAFKA_ADMIN_HOST", self, "localhost"))
 
         self._container_env = {
             "MACHINE_TYPE": self._machine_type,
@@ -38,7 +43,12 @@ class AnalyzerComponent:
             "ANALYZER_CONSUMER_TOPIC": self._consumer_topic,
             "ANALYZER_PRODUCER_SERVERS": self._producer_servers,
             "ANALYZER_PRODUCER_TOPIC": self._producer_topic,
-            "CLOUD_ZONE": self._cloud_zone
+            "CLOUD_ZONE": self._cloud_zone,
+            "PROJECT_NAME": self._project_name,
+            "SERVICE_NAME": self._service_name,
+            "IMAGE_NAME" : self._image_name,
+            "SERVICE_ACCOUNT" : self._service_account,
+            "KAFKA_ADMIN_HOST" : self._kafka_admin_account
         }
 
 
@@ -53,11 +63,11 @@ class AnalyzerComponent:
         topic_deployment_config = TopicDeploymentConfig(
             max_instance=self._max_instance,
             topic_id=self._producer_topic,
-            project_name=str(get_config("PROJECT_NAME", self, "personal-project-408003")),
-            service_name=str(get_config("SERVICE_NAME", self, "analyzer")),
-            image_name=str(get_config("IMAGE_NAME", self, "betester/analyzer:latest")),
+            project_name=self._project_name,
+            service_name=self._service_name,
+            image_name=self._service_name,
             zone=self._cloud_zone,
-            service_account=str(get_config("SERVICE_ACCOUNT", self, "877295035922-compute@developer.gserviceaccount.com")),
+            service_account=self._service_account,
             image_env=self._container_env,
             machine_type=self._machine_type,
             provider=self._cloud_provider
@@ -98,11 +108,11 @@ class AnalyzerComponent:
         topic_deployment_config = TopicDeploymentConfig(
             max_instance=self._max_instance,
             topic_id=self._producer_topic,
-            project_name=str(get_config("PROJECT_NAME", self, "personal-project-408003")),
-            service_name=str(get_config("SERVICE_NAME", self, "analyzer")),
-            image_name=str(get_config("IMAGE_NAME", self, "betester/analyzer:latest")),
+            project_name=self._project_name,
+            service_name=self._service_name,
+            image_name=self._service_name,
             zone=self._cloud_zone,
-            service_account=str(get_config("SERVICE_ACCOUNT", self, "877295035922-compute@developer.gserviceaccount.com")),
+            service_account=self._service_account,
             image_env=self._container_env,
             machine_type=self._machine_type,
             provider=self._cloud_provider

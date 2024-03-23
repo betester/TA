@@ -1,5 +1,4 @@
 # contains script for local deployment on the cloud
-
 import os
 import time
 import json
