@@ -1,4 +1,5 @@
 
+from os import chmod
 from uuid import uuid4
 from logging import Logger
 from fogverse.util import get_config
@@ -51,6 +52,8 @@ class MasterComponent:
         with open(config_file_name, "w") as f:
             for key, val in container_env.items():
                 f.write(f"{key}={val}\n")
+
+        chmod(config_file_name, 0o755)
 
         return f"./{config_file_name}"
 
