@@ -89,8 +89,8 @@ async def main():
             "wait_time": 10
         },
         "master" : {
-            "next_config": ["crawler", "analyzer"],
-            "wait_time": 10
+            "next_config": ["crawler", "analyzer", "discord_bot", "client"],
+            "wait_time": 5
         },
     }
 

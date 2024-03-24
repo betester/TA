@@ -1,7 +1,8 @@
 import asyncio
 from fogverse import Producer, Profiling
-from crawler import CrawlerResponse
+from model.crawler_contract import CrawlerResponse
 from fogverse.util import get_config
+
 
 class DiscordProducer(Producer, Profiling):
     def __init__(self, messages):
@@ -12,6 +13,9 @@ class DiscordProducer(Producer, Profiling):
         self._closed = False
         Producer.__init__(self)
         Profiling.__init__(self, name='discord-logs', dirname='discord-logs')
+
+    def encode(self, data: CrawlerResponse) -> bytes:
+        return data.model_dump_json().encode()
 
     async def receive(self):
         try:

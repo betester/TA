@@ -5,8 +5,8 @@ from analyzer import DisasterAnalyzer
 from fogverse.general import ParallelRunnable
 from master.contract import TopicDeploymentConfig
 from master.master import ConsumerAutoScaler, ProducerObserver
-from .contract import DisasterAnalyzerResponse
-from crawler.contract import CrawlerResponse
+from model.analyzer_contract import DisasterAnalyzerResponse
+from model.crawler_contract import CrawlerResponse
 from fogverse import Producer, Consumer
 from fogverse.fogverse_logging import get_logger
 from typing import Optional

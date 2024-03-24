@@ -84,7 +84,6 @@ class Runnable:
         except Exception as e:
             self.on_error(e)
         finally:
-            print("Ini bakalan selalu kepanggil")
             _call_func(self, '_before_close')
             await self._close()
             _call_func(self, '_after_close')
