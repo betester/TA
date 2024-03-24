@@ -9,7 +9,7 @@ from master.master import AutoDeployer, ConsumerAutoScaler, DeployScripts, Produ
 from confluent_kafka.admin import AdminClient
 from functools import partial
 
-from master.worker import InputOutputRatioWorker, StatisticWorker
+from master.worker import InputOutputRatioWorker, ProfillingWorker, StatisticWorker
 from scripts.local_deploy import deploy_instance_with_process
 
 
@@ -109,6 +109,8 @@ class MasterComponent:
 
         statistic_worker = StatisticWorker(maximum_seconds=window_max_second)
         topic_spike_checker = TopicSpikeChecker(statistic_worker)
+        profilling_worker = ProfillingWorker()
+
         deploy_script = DeployScripts()
 
         deploy_script.set_deploy_functions(
@@ -128,7 +130,7 @@ class MasterComponent:
             below_threshold_callback=auto_deployer.deploy
         )
 
-        workers = [statistic_worker, input_output_worker, auto_deployer]
+        workers = [statistic_worker, input_output_worker, auto_deployer, profilling_worker]
 
         return Master(
             consumer_topic=consumer_topic,
