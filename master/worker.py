@@ -1,10 +1,13 @@
 
+from datetime import datetime
 from collections.abc import Callable, Coroutine
 from typing import Any
 from aiokafka.client import asyncio
 
 from aiokafka.conn import functools
-from fogverse.fogverse_logging import get_logger
+from numpy import source
+from fogverse.fogverse_logging import FogVerseLogging, get_csv_logger, get_logger
+from fogverse.util import get_timestamp
 from master.contract import InputOutputThroughputPair, MachineConditionData, MasterObserver, TopicStatistic
 
 class StatisticWorker(MasterObserver, TopicStatistic):
@@ -88,6 +91,76 @@ class StatisticWorker(MasterObserver, TopicStatistic):
     async def stop(self):
         self._stop = True
 
+class ProfillingWorker(MasterObserver):
+
+    def __init__(self):
+
+        self.__headers = [
+            "timestamp",
+            "source_topic",
+            "target_topic",
+            "source_throughput_per_second",
+            "target_throughput_per_second"
+        ]
+
+        self._fogverse_logger = FogVerseLogging(
+            name=f"{self.__class__.__name__}-{datetime.now()}",
+            csv_header=self.__headers
+        )
+
+        self._topics_current_count: dict[str, int] = {} 
+        self._topics_throughput_pair: dict[str, list[str]] = {}
+
+        self._stop = False
+
+    def on_receive(self, data: InputOutputThroughputPair | MachineConditionData):
+        if isinstance(data, InputOutputThroughputPair):
+            target_topics = self._topics_throughput_pair.get(data.source_topic, [])
+            target_topics.append(data.target_topic)
+            self._topics_throughput_pair[data.source_topic] = target_topics
+        else:
+            topic_current_count = self._topics_current_count.get(data.target_topic, 0)
+            topic_current_count += data.total_messages
+            self._topics_current_count[data.target_topic] = topic_current_count
+
+    def _csv_message(self, data : dict[str, Any]):
+        message = []
+        
+        for header in self.__headers:
+            message.append(data.get(header, ""))
+    
+        return message
+
+    def _flush(self):
+        for topic in self._topics_current_count:
+            self._topics_current_count[topic] = 0
+
+    async def start(self):
+        while not self._stop:
+            try:
+                await asyncio.sleep(1)            
+                for source_topic, target_topics in self._topics_throughput_pair:
+                    source_topic_count = self._topics_current_count.get(source_topic, 0)
+
+                    for target_topic in target_topics:
+                        target_topic_count = self._topics_current_count.get(source_topic, 0)
+                        self._fogverse_logger.csv_log(self._csv_message({
+                            "timestamp" : datetime.now(),
+                            "source_topic" : source_topic,
+                            "target_topic" : target_topic,
+                            "source_throughput_per_second" : source_topic_count,
+                            "target_throughput_per_second" : target_topic_count
+                        }))
+
+                self._flush()
+
+            except Exception as e:
+                self._fogverse_logger.std_log(e)
+
+
+    async def stop(self):
+        self._stop = True
+
 class InputOutputRatioWorker(MasterObserver):
 
     def __init__(
@@ -128,6 +201,11 @@ class InputOutputRatioWorker(MasterObserver):
             topic_current_count += data.total_messages
             self._topics_current_count[data.target_topic] = topic_current_count
 
+    def _flush(self):
+        for topic, throughput in self._topics_current_count.items():
+            self._logger.info(f"Topic {topic} total message in {self._refresh_rate_second} seconds: {throughput}")
+            self._topics_current_count[topic] = 0
+
     async def start(self):
         self._logger.info("Starting input output ratio worker")
         while not self._stop:
@@ -145,10 +223,8 @@ class InputOutputRatioWorker(MasterObserver):
                     if throughput_ratio < self._input_output_ratio_threshold:
                         self._logger.info(f"{throughput_ratio} is less than threshold: {self._input_output_ratio_threshold}")
                         await self._below_threshold_callback(source_topic, source_topic_throughput/self._refresh_rate_second, target_topic)
-
-            for topic, throughput in self._topics_current_count.items():
-                self._logger.info(f"Topic {topic} total message in {self._refresh_rate_second} seconds: {throughput}")
-                self._topics_current_count[topic] = 0
+            
+            self._flush()
             
     async def stop(self):
         self._stop = True 
