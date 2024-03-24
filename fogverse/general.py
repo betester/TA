@@ -107,7 +107,7 @@ class ParallelRunnable:
         self.consumer_tasks = []
         self.producer_tasks = []
 
-    def run(self, on_producer_complete: Callable[[str, int, Callable[[str, bytes], Any]], None]):
+    def run(self):
         consumer_thread_pool = ThreadPoolExecutor(self.total_consumer)
         producer_thread_pool = ThreadPoolExecutor(self.total_producer)
 
@@ -120,17 +120,15 @@ class ParallelRunnable:
                     self.queue,
                     stop_event
                 )
-                for i in range(self.total_consumer)
+                for _ in range(self.total_consumer)
             ]
 
             self.producer_tasks = [
                 producer_thread_pool.submit(
                     self.producer.start_produce,
                     self.queue,
-                    stop_event,
-                    on_producer_complete,
-                    i
-                ) for i in range(self.total_producer)
+                    stop_event
+                ) for _ in range(self.total_producer)
             ]
 
             while True:

@@ -131,7 +131,7 @@ class AnalyzerComponent:
             kafka_server=self._producer_servers,
             processor=analyzer_processor,
             start_producer_callback=start_producer_callback,
-            batch_size=1
+            on_complete=producer_observer.send_total_successful_messages
         )
 
         runnable = ParallelRunnable(
@@ -141,5 +141,5 @@ class AnalyzerComponent:
             total_producer=5
         )
 
-        return ParallelAnalyzerJobService(runnable, producer_observer)
+        return ParallelAnalyzerJobService(runnable)
 

@@ -117,10 +117,12 @@ class ConfluentConsumer:
                  group_id: str,
                  consumer_auto_scaler,
                  consumer_extra_config: dict={},
-                 poll_time=1.0
+                 poll_time=1.0,
+                 batch_size: int = 1
                  ):
 
         self.poll_time = poll_time
+        self.batch_size = batch_size
 
         self.consumer = Consumer({
             **consumer_extra_config,
@@ -153,7 +155,7 @@ class ConfluentConsumer:
 
         try:
             while not stop_event.is_set():
-                message: Message = self.consumer.poll(self.poll_time)
+                message: Message = self.consumer.consume(self.batch_size, self.poll_time)
                 queue.put(message)
         except Exception as e:
             self.log.error(e)
@@ -166,6 +168,7 @@ class ConfluentProducer:
                  kafka_server: str,
                  processor: Processor,
                  start_producer_callback : Callable[[Callable[[str, bytes], Any]], Any],
+                 on_complete: Callable[[str, int, Callable[[str, bytes], Any]], None],
                  producer_extra_config: dict={},
                  batch_size: int = 1):
         
@@ -180,11 +183,13 @@ class ConfluentProducer:
 
         self.batch_size = batch_size
         self._callback_is_called = False
+
         self.start_producer_callback = start_producer_callback
+        self.producer_on_complete = on_complete
 
         self.log = get_logger()
     
-    def start_produce(self, queue: queue.Queue, stop_event: Event, on_complete: Callable[[str, int, Callable[[str, bytes], Any]], None], thread_id: int):
+    def start_produce(self, queue: queue.Queue, stop_event: Event):
 
         if self.start_producer_callback and not self._callback_is_called:
             self._callback_is_called = True
@@ -214,7 +219,7 @@ class ConfluentProducer:
                         self.producer.flush()
                     queue.task_done()
                     message_batch.clear()
-                    on_complete(
+                    self.producer_on_complete(
                         self.topic,
                         total_messages,
                         lambda x, y: self.producer.produce(
