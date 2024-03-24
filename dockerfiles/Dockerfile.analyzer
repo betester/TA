@@ -1,14 +1,12 @@
-FROM python:3.11
+FROM pytorch/pytorch:2.2.1-cuda12.1-cudnn8-runtime
 
 WORKDIR /app
 COPY analyzer ./analyzer
 COPY master ./master
 COPY fogverse ./fogverse
 COPY crawler ./crawler
-COPY model ./model
-COPY mocking_bird ./mocking_bird
-COPY jay_bird ./jay_bird
 COPY requirements/analyzer.txt ./
+COPY scripts ./scripts
 
 RUN pip install -r analyzer.txt
 

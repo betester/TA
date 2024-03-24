@@ -1,4 +1,4 @@
-FROM python:3.11
+FROM python:3.10
 
 WORKDIR /app
 COPY crawler ./crawler
@@ -7,6 +7,7 @@ COPY master ./master
 COPY data ./data
 COPY model ./model
 COPY requirements/crawler.txt ./
+COPY scripts ./scripts
 
 RUN pip install -r crawler.txt
 

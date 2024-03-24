@@ -1,3 +1,0 @@
-CRAWLER_ANALYZER_SERVERS=kafka.asia-southeast1-b.c.personal-project-408003.internal:9092
-CRAWLER_PRODUCER_TOPIC=analyze
-CRAWLER_CONSUMER_GROUP_ID=crawler

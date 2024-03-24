@@ -4,4 +4,6 @@
 *-logs*
 *.log*
 *.bin
+secrets
+configs
 *firebase-key.json

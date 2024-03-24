@@ -1,54 +1,47 @@
 # contains script for local deployment on the cloud
-
 import os
 import time
 import json
 import asyncio
+
 from asyncio.subprocess import PIPE, STDOUT 
 
-from dotenv import load_dotenv, find_dotenv
 
-load_dotenv(find_dotenv())
-
-# this can be used for deploying instance that uses docker image
-async def deploy_local_instance(
+async def deploy_instance_with_process(
     project_name: str,
     service_name: str,
     image_name: str,
     zone: str,
     service_account: str,
-    container_env: str
+    container_env: str,
+    machine_type: str = "CPU"
     ):
+    
+    deploy_script_resource = "create_cpu_instance.sh" if machine_type == "CPU" else "create_gpu_instance.sh"
+    cmd = f"./scripts/{deploy_script_resource} {service_name} {project_name} {zone} {service_account} '{container_env}' {image_name}"
 
-    cmd = (
-        f"gcloud compute instances create-with-container {service_name} "
-            f"--project={project_name} "
-            f"--zone={zone} "
-            f"--container-image={image_name} "
-            "--machine-type=e2-medium "
-            "--network-interface=network-tier=PREMIUM,subnet=default "
-            "--maintenance-policy=MIGRATE "
-            "--provisioning-model=STANDARD "
-            f"--service-account={service_account} "
-            "--scopes=https://www.googleapis.com/auth/devstorage.read_only,https://www.googleapis.com/auth/logging.write,https://www.googleapis.com/auth/monitoring.write,https://www.googleapis.com/auth/servicecontrol,https://www.googleapis.com/auth/service.management.readonly,https://www.googleapis.com/auth/trace.append "
-            "--tags=http-server,https-server "
-            "--image=projects/cos-cloud/global/images/cos-stable-109-17800-147-28 "
-            "--boot-disk-size=25GB "
-            "--boot-disk-type=pd-balanced "
-            f"--boot-disk-device-name={service_name} "
-            "--container-restart-policy=always "
-            f"--container-env-file={container_env} "
+    process = await asyncio.create_subprocess_shell(
+        cmd,
+        stdin=PIPE,
+        stdout=PIPE,
+        stderr=STDOUT
     )
 
+    return process
 
-    cmd += (
-        "--container-mount-host-path=host-path=/tmp,mode=rw,mount-path=/bitnami "
-        "--no-shielded-secure-boot "
-        "--shielded-vtpm "
-        "--shielded-integrity-monitoring "
-        "--labels=goog-ec-src=vm_add-gcloud,container-vm=cos-stable-109-17800-147-28"
-    )
 
+async def deploy_instance(
+    project_name: str,
+    service_name: str,
+    image_name: str,
+    zone: str,
+    service_account: str,
+    container_env: str,
+    machine_type: str = "CPU"
+    ):
+    
+    deploy_script_resource = "create_cpu_instance.sh" if machine_type == "CPU" else "create_gpu_instance.sh"
+    cmd = f"./scripts/{deploy_script_resource} {service_name} {project_name} {zone} {service_account} '{container_env}' {image_name}"
 
     process = await asyncio.create_subprocess_shell(
         cmd,
@@ -59,11 +52,28 @@ async def deploy_local_instance(
 
     if process.stdout:
         async for line in process.stdout:
-            print(line)
+            print(line.decode('utf-8'))
 
+
+# this can be used for deploying instance that uses docker image
+
+def parse_txt(source_file: str):
+    cmd = ""
+
+    with open(source_file) as f:
+        for content in f:
+            no_newline = content.rstrip('\n')
+            cmd += f" -e {no_newline}"
+    
+    return cmd
 
 async def main():
     # relative towards the project change this if you run it from not from the root project 
+
+
+    from dotenv import load_dotenv, find_dotenv
+    load_dotenv(find_dotenv())
+
     config_path = "configs" 
 
     PROJECT = os.environ.get("PROJECT")
@@ -72,7 +82,7 @@ async def main():
     assert ZONE is not None
     SERVICE_ACCOUNT = os.environ.get("SERVICE_ACCOUNT")
     assert SERVICE_ACCOUNT is not None
-    
+
     configs = {
         "kafka" : {
             "next_config": ["master"],
@@ -81,40 +91,46 @@ async def main():
         "master" : {
             "next_config": ["crawler", "analyzer", "discord_bot", "client"],
             "wait_time": 5
-        }
+        },
     }
 
     current_config = ["kafka"]
 
     while len(current_config) != 0:
 
-        config_name = current_config.pop(-1)
+        config_name = current_config.pop()
 
         print(f"Deploying {config_name} service")
 
         config_source = f"{os.path.join(config_path, config_name)}.txt"
         config_metadata = f"{os.path.join(config_path, config_name)}.json"
 
+
         with open(config_metadata) as f:
             metadata = json.load(f) 
             image_name = metadata['IMAGE']
+            extra_config = configs.get(config_name, {})
 
-            await deploy_local_instance(
+            machine_type = extra_config.get("machine_type", "CPU")
+            env = config_source
+            zone = ZONE
+
+            await deploy_instance(
                 PROJECT,
                 config_name,
                 image_name,
-                ZONE,
+                zone,
                 SERVICE_ACCOUNT,
-                config_source
+                env,
+                machine_type
             )
         
-        extra_config = configs.get(config_name, {})
         wait_time = extra_config.get("wait_time", 0)
 
         if wait_time != 0:
             print(f"Waiting for {wait_time}, making sure {config_name} service is configured")
             time.sleep(wait_time)
-    
+
         next_config = extra_config.get("next_config", [])
 
         for config in next_config:

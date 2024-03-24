@@ -1,7 +1,10 @@
 from asyncio import StreamReader, Task
+
 import os
 import time
+from uuid import uuid4
 
+from logging import Logger
 from collections.abc import Callable, Coroutine
 from typing import Any, Optional
 from aiokafka.client import asyncio
@@ -19,7 +22,6 @@ from confluent_kafka import Consumer, KafkaException, Message, TopicCollection
 from fogverse.fogverse_logging import get_logger
 from fogverse.util import get_timestamp
 from master.contract import (
-    CloudProvider,
     DeployResult, 
     InputOutputThroughputPair, 
     MachineConditionData, 
@@ -292,17 +294,16 @@ class ProducerObserver:
 class DeployScripts:
 
     def __init__(self, log_dir_path: str='logs'):
-        self._deploy_functions: dict[CloudProvider, Callable[[TopicDeploymentConfig], Coroutine[Any, Any, DeployResult]]] = {}
-        self._deploy_functions[CloudProvider.LOCAL] = self._local_deployment
-        self._deploy_functions[CloudProvider.GOOGLE_CLOUD] = self._gooogle_deployment
+        self._deploy_functions: dict[str, Callable[[TopicDeploymentConfig, Logger], Coroutine[Any, Any, DeployResult]]] = {}
+        self._deploy_functions["LOCAL"] = self._local_deployment
         self._log_dir_path = log_dir_path
 
         self._logger = get_logger(name=self.__class__.__name__)
 
-    def get_deploy_functions(self, cloud_provider: CloudProvider):
+    def get_deploy_functions(self, cloud_provider: str):
         return self._deploy_functions[cloud_provider]
 
-    def set_deploy_functions(self, cloud_provider: CloudProvider, deploy_function: Callable[[TopicDeploymentConfig], Coroutine[Any, Any, DeployResult]]):
+    def set_deploy_functions(self, cloud_provider: str, deploy_function: Callable[[TopicDeploymentConfig, Logger], Coroutine[Any, Any, DeployResult]]):
         self._deploy_functions[cloud_provider] = deploy_function
     
     async def write_deployed_service_logs(self, file_name: str, stdout: StreamReader):
@@ -313,13 +314,16 @@ class DeployScripts:
                 async for line in stdout:
                     f.write(line.decode('utf-8'))
         except Exception as e:
-            print(f"An error occurred while writing logs: {e}")
-
+            self._logger.error(f"An error occurred while writing logs: {e}")
+    
+    async def _write_deploy_logs(self, stdout: StreamReader):
+        try:
+            async for line in stdout:
+                self._logger.info(line.decode('utf-8'))
+        except Exception as e:
+            self._logger.error(f"An error occurred while writing logs: {e}")
+    
     async def _local_deployment(self, configs: TopicDeploymentConfig) -> DeployResult:
-
-        # sets every environment variable passed on the configs
-        for key, val in configs.cloud_deploy_configs.env:
-            os.environ[key] = val
 
         cmd = f'python -m {configs.service_name}'
         self._logger.info(f"Running script: {cmd}")
@@ -330,11 +334,10 @@ class DeployScripts:
             stderr = STDOUT
         )
 
-        async def kill_process_and_task(process: Process, task: Task) -> bool:
+        async def kill_process_and_task() -> bool:
             self._logger.info(f"Shutting down {process.pid}")
             try:
                 process.kill()
-                task.cancel()
                 return True
             except Exception as e:
                 self._logger.error(f"Fail shutting down process {process.pid}, please turn off them manually", e)
@@ -344,18 +347,14 @@ class DeployScripts:
         if process.stdout:
             log_file_name = f'{configs.service_name}-{process.pid}.log'
             self._logger.info(f"Writing service {configs.service_name} logs with filename: {log_file_name}")
-            task = asyncio.create_task(self.write_deployed_service_logs(log_file_name, process.stdout)) 
+            asyncio.create_task(self.write_deployed_service_logs(log_file_name, process.stdout)) 
             self._logger.info(f"Command executed successfully, service {configs.service_name} is deployed")
             return DeployResult(
-                machine_id=process.pid,
-                shut_down_machine= lambda process_pid : kill_process_and_task(process, task)
+                machine_id=str(process.pid),
+                shut_down_machine= kill_process_and_task
             ) 
 
         raise Exception("Process cannot be created")
-
-
-    async def _gooogle_deployment(self, configs: TopicDeploymentConfig) -> DeployResult:
-        pass
 
 class AutoDeployer(MasterObserver):
 
@@ -383,9 +382,11 @@ class AutoDeployer(MasterObserver):
         self._deploy_delay = deploy_delay
 
         self._logger = get_logger(name=self.__class__.__name__)
+        
         self._topic_deployment_configs: dict[str, TopicDeploymentConfig] = {}
         self._machine_ids: list[DeployResult] = []
         self._can_deploy_topic: dict[str, TopicDeployDelay] = {}
+        self._topic_total_deployment: dict[str, int] = {}
 
     async def delay_deploy(self, topic_id: str):
         await asyncio.sleep(self._deploy_delay)
@@ -408,25 +409,55 @@ class AutoDeployer(MasterObserver):
     
     async def deploy(self, source_topic: str, source_total_calls: float, target_topic: str) -> bool:
         try:
-            
             if target_topic not in self._can_deploy_topic:
                 self._logger.info(f"Topic {target_topic} does not exist, might be not sending heartbeat during initial start or does not have deployment configs")
                 return False
 
             async with self._can_deploy_topic[target_topic]._lock:
+
                 if not self._can_deploy_topic[target_topic].can_be_deployed:
                     time_remaining = get_timestamp() - self._can_deploy_topic[target_topic].deployed_timestamp
                     self._logger.info(f"Cannot be deployed yet, time remaining: {time_remaining}")
                     return False
+            
+                maximum_topic_deployment = self._topic_deployment_configs[target_topic].max_instance
+                current_deployed_replica = self._topic_total_deployment.get(target_topic, 0)
+
+                service_name = self._topic_deployment_configs[target_topic].service_name
+                provider = self._topic_deployment_configs[target_topic].provider
+
+                if current_deployed_replica >= maximum_topic_deployment:
+                    self._logger.info(
+                        f"Cannot deploy service {service_name} exceeds maximum limit.\n" 
+                        f"current deployed : {current_deployed_replica}\n"
+                        f"maximum replica : {maximum_topic_deployment}"
+                    )
+                    return False
 
                 if self._should_be_deployed(source_topic, source_total_calls):
+                    self._logger.info(f"Deploying new machine for service {service_name} to cloud provider: {provider}")
+
                     machine_deployer = self._deploy_scripts.get_deploy_functions(
-                        self._topic_deployment_configs[target_topic].cloud_deploy_configs.provider
+                        self._topic_deployment_configs[target_topic].provider
                     )
-                    deploy_result = await machine_deployer(self._topic_deployment_configs[target_topic])
+
+                    if machine_deployer is None:
+                        self._logger.info(f"No deploy script for {provider}, deployment cancelled (you might need to set up deloy script on component)")
+                        return False
+
+                    self._logger.info("Starting deployment script")
+                    starting_time = get_timestamp()
+                    deploy_result = await machine_deployer(self._topic_deployment_configs[target_topic], self._logger)
+                    self._logger.info(f"Deployment finished, time taken: {get_timestamp() - starting_time}")
+                        
+                    if not deploy_result:
+                        self._logger.error(f"Deployment failed for service {service_name}")
+                        return False
+
                     self._machine_ids.append(deploy_result)
                     self._can_deploy_topic[target_topic].can_be_deployed = False
                     self._can_deploy_topic[target_topic].deployed_timestamp = get_timestamp()
+                    self._topic_total_deployment[target_topic] = current_deployed_replica + 1
                     asyncio.create_task(self.delay_deploy(target_topic))
                     return True
             
@@ -434,12 +465,12 @@ class AutoDeployer(MasterObserver):
                 return False
 
         except Exception as e:
-            self._logger.info(e)
+            self._logger.error(e)
             return False
     
     async def stop(self):
         for deploy_result in self._machine_ids:
-            await deploy_result.shut_down_machine(deploy_result.machine_id)
+            await deploy_result.shut_down_machine()
 
 class TopicSpikeChecker:
 
@@ -455,5 +486,7 @@ class TopicSpikeChecker:
 
         self._logger.info(f"Topic {topic_id} statistics:\nMean: {mean}\nStandard Deviation: {std}\nZ-Score:{z_score}")
         #TODO: put explanation probably whether it's most likely can be deployed or not
+            
+        self._logger.info(f"{z_score < z_threshold}")
         return z_score < z_threshold
 

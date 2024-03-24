@@ -3,61 +3,9 @@
 
 version: "2"
 
-networks:
-  moke_network:
-    driver: bridge
-
 services:
-  master:
-    networks:
-        - moke_network
-    build: 
-      context: .
-      dockerfile: dockerfiles/Dockerfile.master
-    depends_on:
-      - kafka_broker
-    restart: always
-    environment:
-      - KAFKA_ADMIN_HOST=kafka_broker
-      - OBSERVER_CONSUMER_SERVERS=kafka_broker:9092 
-
-  crawler:
-    networks:
-        - moke_network
-    build: 
-      context: .
-      dockerfile: dockerfiles/Dockerfile.crawler
-    depends_on:
-      - master
-    restart: always
-    environment:
-      - KAFKA_ADMIN_HOST=kafka_broker
-      - CRAWLER_ANALYZER_SERVERS=kafka_broker:9092 
-      - ANALYZER_MODE=serial 
-
-  analyzer:
-    networks:
-        - moke_network
-    build: 
-      context: .
-      dockerfile: dockerfiles/Dockerfile.analyzer
-    depends_on:
-      - master
-    restart: always
-    environment:
-      - KAFKA_ADMIN_HOST=kafka_broker
-      - ANALYZER_CONSUMER_SERVERS=kafka_broker:9092 
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
-  kafka_broker:
+  kafka-broker:
     image: docker.io/bitnami/kafka:3.6
-    networks:
-        - moke_network
     ports:
       - "9092:9092"
     volumes:
@@ -71,11 +19,10 @@ services:
       - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=0@127.0.0.1:9093
       # Listeners
       - KAFKA_CFG_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093
-      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://kafka_broker:9092
+      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://127.0.0.1:9092
       - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
       - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
       - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=PLAINTEXT
-      # - KAFKA_ADVERTISED_HOST_NAME=kafka_broker
       # Logs
       - KAFKA_CFG_LOG_RETENTION_CHECK_INTERVAL_MS=7000
 volumes:

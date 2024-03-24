@@ -4,8 +4,7 @@ import asyncio
 from asyncio.locks import Lock
 from collections.abc import Callable, Coroutine
 from datetime import datetime
-from enum import Enum 
-from typing import Any, Optional
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
@@ -20,21 +19,18 @@ class MachineConditionData(BaseModel):
     target_topic: str
     timestamp: int
     total_messages: int
-    
-class CloudProvider(str, Enum):
-    LOCAL = "LOCAL"
-    GOOGLE_CLOUD = "GOOGLE_CLOUD" 
-    AWS = "AWS"
-
-class CloudDeployConfigs(BaseModel):
-    provider: str = CloudProvider.LOCAL
-    zone: str
-    env: dict[str, str]
 
 class TopicDeploymentConfig(BaseModel):
+    max_instance: int
     topic_id: str
+    project_name: str
     service_name: str
-    cloud_deploy_configs: CloudDeployConfigs
+    image_name: str
+    zone: str
+    service_account: str
+    image_env: dict 
+    machine_type: str
+    provider: str
 
 #TODO: rename this into something else
 class InputOutputThroughputPair(BaseModel):
@@ -50,8 +46,8 @@ class TopicDeployDelay(BaseModel):
 
 
 class DeployResult(BaseModel):
-    machine_id: int 
-    shut_down_machine: Callable[[int], Coroutine[Any, Any, bool]] 
+    machine_id: str
+    shut_down_machine: Callable[[], Coroutine[Any, Any, bool]] 
 
 
 class MasterObserver(ABC):
