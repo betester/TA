@@ -94,7 +94,7 @@ async def main():
         },
     }
 
-    current_config = ["analyzer"]
+    current_config = ["kafka"]
 
     while len(current_config) != 0:
 

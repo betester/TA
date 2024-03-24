@@ -4,8 +4,6 @@ on:
   push:
     branches:
       - main
-      - cloud-auto-deployment #TODO: remove once done
-
 jobs:
   deploy:
     name: Image build
