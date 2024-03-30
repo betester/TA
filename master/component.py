@@ -130,7 +130,7 @@ class MasterComponent:
             below_threshold_callback=auto_deployer.deploy
         )
 
-        workers = [statistic_worker, profilling_worker]
+        workers = [statistic_worker, profilling_worker, input_output_worker, auto_deployer]
 
         return Master(
             consumer_topic=consumer_topic,

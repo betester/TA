@@ -22,14 +22,14 @@ class AnalyzerComponent:
         self._keyword_classifier_model_source = ("keyword", str(get_config("KEYWORD_CLASSIFIER_MODEL_SOURCE", self, "./jay_bird")))
 
         # cloud configs 
-        self._cloud_provider = str(get_config("CLOUD_PROVIDER", self, "GOOGLE_CLOUD"))
-        self._cloud_zone = str(get_config("CLOUD_ZONE", self, "us-west4-a"))
+        self._cloud_provider = str(get_config("CLOUD_PROVIDER", self, "LOCAL"))
+        self._cloud_zone = str(get_config("CLOUD_ZONE", self, ""))
         self._max_instance = int(str(get_config("MAX_INSTANCE", self, "4")))
-        self._machine_type = str(get_config("MACHINE_TYPE", self, "GPU"))
-        self._project_name = str(get_config("PROJECT_NAME", self, "personal-project-408003")) 
+        self._machine_type = str(get_config("MACHINE_TYPE", self, "CPU"))
+        self._project_name = str(get_config("PROJECT_NAME", self, "")) 
         self._service_name = str(get_config("SERVICE_NAME", self, "analyzer"))
         self._image_name = str(get_config("IMAGE_NAME", self, "betester/analyzer:latest"))
-        self._service_account = str(get_config("SERVICE_ACCOUNT", self, "877295035922-compute@developer.gserviceaccount.com"))
+        self._service_account = str(get_config("SERVICE_ACCOUNT", self, ""))
         self._kafka_admin_account = str(get_config("KAFKA_ADMIN_HOST", self, "localhost"))
 
         self._container_env = {
