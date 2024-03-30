@@ -8,7 +8,7 @@ from aiokafka.client import asyncio
 
 from aiokafka.conn import functools
 from fogverse.fogverse_logging import FogVerseLogging, get_logger
-from master.contract import InputOutputThroughputPair, MachineConditionData, MasterObserver, TopicStatistic
+from master.contract import DeployArgs, InputOutputThroughputPair, MachineConditionData, MasterObserver, TopicStatistic
 
 class StatisticWorker(MasterObserver, TopicStatistic):
 
@@ -160,7 +160,7 @@ class InputOutputRatioWorker(MasterObserver):
             self,
             refresh_rate_second: float,
             input_output_ratio_threshold: float,
-            below_threshold_callback: Callable[[str, float, str, float], Coroutine[Any, Any, bool]]
+            below_threshold_callback: Callable[[DeployArgs], Coroutine[Any, Any, bool]]
         ):
         '''
         Worker that helps for counting input output ratio of topic
@@ -216,10 +216,12 @@ class InputOutputRatioWorker(MasterObserver):
                     if throughput_ratio < self._input_output_ratio_threshold:
                         self._logger.info(f"{throughput_ratio} is less than threshold: {self._input_output_ratio_threshold}")
                         await self._below_threshold_callback(
-                            source_topic,
-                            source_topic_throughput/self._refresh_rate_second,
-                            target_topic,
-                            target_topic_throughput/self._refresh_rate_second
+                            DeployArgs(
+                                source_topic=source_topic,
+                                source_topic_throughput=source_topic_throughput/self._refresh_rate_second,
+                                target_topic=target_topic,
+                                target_topic_throughput=target_topic_throughput/self._refresh_rate_second
+                            )
                         )
             
             self._flush()

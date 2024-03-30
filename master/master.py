@@ -1,4 +1,4 @@
-from asyncio import StreamReader, Task
+from asyncio import StreamReader
 
 import os
 import time
@@ -17,11 +17,12 @@ from confluent_kafka.admin import (
     NewTopic
 )
 from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
-from asyncio.subprocess import PIPE, STDOUT, Process 
+from asyncio.subprocess import PIPE, STDOUT 
 from confluent_kafka import Consumer, KafkaException, Message, TopicCollection
 from fogverse.fogverse_logging import get_logger
 from fogverse.util import get_timestamp
 from master.contract import (
+    DeployArgs,
     DeployResult, 
     InputOutputThroughputPair, 
     MachineConditionData, 
@@ -409,8 +410,12 @@ class AutoDeployer(MasterObserver):
     async def start(self):
         pass
     
-    async def deploy(self, source_topic: str, source_total_calls: float, target_topic: str, target_total_calls) -> bool:
+    async def deploy(self, deploy_args: DeployArgs) -> bool:
         try:
+
+            target_topic, source_topic = deploy_args.target_topic, deploy_args.source_topic  
+            target_total_calls, source_total_calls = deploy_args.target_topic_throughput, deploy_args.source_topic_throughput
+
             if target_topic not in self._can_deploy_topic:
                 self._logger.info(f"Topic {target_topic} does not exist, might be not sending heartbeat during initial start or does not have deployment configs")
                 return False

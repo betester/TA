@@ -44,6 +44,12 @@ class TopicDeployDelay(BaseModel):
     deployed_timestamp: datetime
     _lock: asyncio.Lock = Lock()
 
+class DeployArgs(BaseModel):
+    source_topic: str
+    source_topic_throughput: float
+    target_topic: str
+    target_topic_throughput: float
+
 
 class DeployResult(BaseModel):
     machine_id: str
