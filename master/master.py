@@ -324,7 +324,7 @@ class DeployScripts:
         except Exception as e:
             self._logger.error(f"An error occurred while writing logs: {e}")
     
-    async def _local_deployment(self, configs: TopicDeploymentConfig) -> DeployResult:
+    async def _local_deployment(self, configs: TopicDeploymentConfig, logger: Logger) -> DeployResult:
 
         cmd = f'python -m {configs.service_name}'
         self._logger.info(f"Running script: {cmd}")
