@@ -109,7 +109,6 @@ class MasterComponent:
 
         statistic_worker = StatisticWorker(maximum_seconds=window_max_second)
         topic_spike_checker = TopicSpikeChecker(statistic_worker)
-        profilling_worker = ProfillingWorker()
 
         deploy_script = DeployScripts()
 
@@ -117,18 +116,17 @@ class MasterComponent:
             "GOOGLE_CLOUD",
             self.google_deployment
         )
-
         auto_deployer = AutoDeployer(
             deploy_script=deploy_script,
             should_be_deployed=partial(topic_spike_checker.check_spike_by_z_value, z_value),
             deploy_delay=deploy_delay
         )
-
         input_output_worker = InputOutputRatioWorker(
             refresh_rate_second=input_output_refresh_rate,
             input_output_ratio_threshold=input_output_ratio_threshold,
             below_threshold_callback=auto_deployer.deploy
         )
+        profilling_worker = ProfillingWorker(auto_deployer.get_topic_total_machine)
 
         workers = [statistic_worker, profilling_worker, input_output_worker, auto_deployer]
 

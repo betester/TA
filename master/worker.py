@@ -9,6 +9,7 @@ from aiokafka.client import asyncio
 from aiokafka.conn import functools
 from fogverse.fogverse_logging import FogVerseLogging, get_logger
 from master.contract import InputOutputThroughputPair, MachineConditionData, MasterObserver, TopicStatistic
+from master.master import AutoDeployer
 
 class StatisticWorker(MasterObserver, TopicStatistic):
 
@@ -93,8 +94,9 @@ class StatisticWorker(MasterObserver, TopicStatistic):
 
 class ProfillingWorker(MasterObserver):
 
-    def __init__(self):
+    def __init__(self, total_machine_deployed : Callable[[str], int]):
 
+        self._total_machine_deployed = total_machine_deployed
         self.__headers = [
             "topic",
             "topic_throughput_per_second"
@@ -134,10 +136,11 @@ class ProfillingWorker(MasterObserver):
             try:
                 await asyncio.sleep(1)            
                 self._fogverse_logger.std_log(self._topics_current_count)
-                for topic, topic_current_count in self._topics_current_count.items():
+                for topic, topic_current_count in self._topics_current_count:
                     log = self._csv_message({
                         "topic" : topic,
-                        "topic_throughput_per_second" : topic_current_count
+                        "topic_throughput_per_second" : topic_current_count,
+                        "topic_machine_deployed" : str(self._total_machine_deployed(topic))
                     })
 
                     self._fogverse_logger.csv_log(log)

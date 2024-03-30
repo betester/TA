@@ -392,6 +392,8 @@ class AutoDeployer(MasterObserver):
         await asyncio.sleep(self._deploy_delay)
         self._can_deploy_topic[topic_id].can_be_deployed = True
 
+    def get_topic_total_machine(self, topic: str) -> int:
+        return self._topic_total_deployment[topic]
 
     def on_receive(self, data: InputOutputThroughputPair | MachineConditionData):
         if isinstance(data, MachineConditionData):
