@@ -1,0 +1,22 @@
+FROM python:3.11
+
+WORKDIR /app
+
+# Copy moke and requirements.txt to the work directory
+
+COPY master ./master
+COPY model ./model
+COPY fogverse ./fogverse
+COPY scripts ./scripts
+
+COPY moke ./moke
+
+COPY requirements/moke.txt ./
+COPY requirements/master.txt ./
+
+# Install any needed dependencies specified in requirements.txt
+RUN pip install -r moke.txt
+RUN pip install -r master.txt
+
+# Run app.py when the container launches
+CMD ["python", "-m", "moke"]
