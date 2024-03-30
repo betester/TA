@@ -155,8 +155,9 @@ class ConfluentConsumer:
 
         try:
             while not stop_event.is_set():
-                message: Message = self.consumer.consume(self.batch_size, self.poll_time)
-                queue.put(message)
+                messages: list[Message] = self.consumer.consume(self.batch_size, self.poll_time)
+                for message in messages:
+                    queue.put(message)
         except Exception as e:
             self.log.error(e)
 
@@ -187,7 +188,7 @@ class ConfluentProducer:
         self.start_producer_callback = start_producer_callback
         self.producer_on_complete = on_complete
 
-        self.log = get_logger()
+        self.log = get_logger(name=self.__class__.__name__)
     
     def start_produce(self, queue: queue.Queue, stop_event: Event):
 

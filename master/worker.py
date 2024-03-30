@@ -1,13 +1,13 @@
 
-from datetime import datetime
+import logging
+
 from collections.abc import Callable, Coroutine
 from typing import Any
+from uuid import uuid4
 from aiokafka.client import asyncio
 
 from aiokafka.conn import functools
-from numpy import source
-from fogverse.fogverse_logging import FogVerseLogging, get_csv_logger, get_logger
-from fogverse.util import get_timestamp
+from fogverse.fogverse_logging import FogVerseLogging, get_logger
 from master.contract import InputOutputThroughputPair, MachineConditionData, MasterObserver, TopicStatistic
 
 class StatisticWorker(MasterObserver, TopicStatistic):
@@ -96,29 +96,21 @@ class ProfillingWorker(MasterObserver):
     def __init__(self):
 
         self.__headers = [
-            "timestamp",
-            "source_topic",
-            "target_topic",
-            "source_throughput_per_second",
-            "target_throughput_per_second"
+            "topic",
+            "topic_throughput_per_second"
         ]
 
         self._fogverse_logger = FogVerseLogging(
-            name=f"{self.__class__.__name__}-{datetime.now()}",
-            csv_header=self.__headers
+            name=f"{self.__class__.__name__}-{uuid4()}",
+            csv_header=self.__headers,
+            level= logging.INFO + 2
         )
 
         self._topics_current_count: dict[str, int] = {} 
-        self._topics_throughput_pair: dict[str, list[str]] = {}
-
         self._stop = False
 
     def on_receive(self, data: InputOutputThroughputPair | MachineConditionData):
-        if isinstance(data, InputOutputThroughputPair):
-            target_topics = self._topics_throughput_pair.get(data.source_topic, [])
-            target_topics.append(data.target_topic)
-            self._topics_throughput_pair[data.source_topic] = target_topics
-        else:
+        if isinstance(data, MachineConditionData):
             topic_current_count = self._topics_current_count.get(data.target_topic, 0)
             topic_current_count += data.total_messages
             self._topics_current_count[data.target_topic] = topic_current_count
@@ -136,21 +128,19 @@ class ProfillingWorker(MasterObserver):
             self._topics_current_count[topic] = 0
 
     async def start(self):
+        self._fogverse_logger.std_log(f"Starting {self.__class__.__name__}")
+
         while not self._stop:
             try:
                 await asyncio.sleep(1)            
-                for source_topic, target_topics in self._topics_throughput_pair:
-                    source_topic_count = self._topics_current_count.get(source_topic, 0)
+                self._fogverse_logger.std_log(self._topics_current_count)
+                for topic, topic_current_count in self._topics_current_count.items():
+                    log = self._csv_message({
+                        "topic" : topic,
+                        "topic_throughput_per_second" : topic_current_count
+                    })
 
-                    for target_topic in target_topics:
-                        target_topic_count = self._topics_current_count.get(source_topic, 0)
-                        self._fogverse_logger.csv_log(self._csv_message({
-                            "timestamp" : datetime.now(),
-                            "source_topic" : source_topic,
-                            "target_topic" : target_topic,
-                            "source_throughput_per_second" : source_topic_count,
-                            "target_throughput_per_second" : target_topic_count
-                        }))
+                    self._fogverse_logger.csv_log(log)
 
                 self._flush()
 

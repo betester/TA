@@ -4,7 +4,7 @@ import os
 from master.master import ProducerObserver
 
 from .crawler import MockUpCrawler
-from ..model.crawler_contract import CrawlerResponse
+from model.crawler_contract import CrawlerResponse
 from .handler import CrawlerProducer
 from fogverse.util import get_config
 
