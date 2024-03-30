@@ -409,7 +409,7 @@ class AutoDeployer(MasterObserver):
     async def start(self):
         pass
     
-    async def deploy(self, source_topic: str, source_total_calls: float, target_topic: str) -> bool:
+    async def deploy(self, source_topic: str, source_total_calls: float, target_topic: str, target_total_calls) -> bool:
         try:
             if target_topic not in self._can_deploy_topic:
                 self._logger.info(f"Topic {target_topic} does not exist, might be not sending heartbeat during initial start or does not have deployment configs")
@@ -436,7 +436,10 @@ class AutoDeployer(MasterObserver):
                     )
                     return False
 
-                if self._should_be_deployed(source_topic, source_total_calls):
+                source_topic_is_not_spike = self._should_be_deployed(source_topic, source_total_calls)
+                target_topic_is_not_spike = self._should_be_deployed(target_topic, target_total_calls) 
+
+                if source_topic_is_not_spike and target_topic_is_not_spike:
                     self._logger.info(f"Deploying new machine for service {service_name} to cloud provider: {provider}")
 
                     machine_deployer = self._deploy_scripts.get_deploy_functions(
@@ -487,7 +490,6 @@ class TopicSpikeChecker:
         z_score = (topic_throughput - mean)/std
 
         self._logger.info(f"Topic {topic_id} statistics:\nMean: {mean}\nStandard Deviation: {std}\nZ-Score:{z_score}")
-        #TODO: put explanation probably whether it's most likely can be deployed or not
             
         self._logger.info(f"{z_score < z_threshold}")
         return z_score < z_threshold

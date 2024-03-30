@@ -160,7 +160,7 @@ class InputOutputRatioWorker(MasterObserver):
             self,
             refresh_rate_second: float,
             input_output_ratio_threshold: float,
-            below_threshold_callback: Callable[[str, float, str], Coroutine[Any, Any, bool]]
+            below_threshold_callback: Callable[[str, float, str, float], Coroutine[Any, Any, bool]]
         ):
         '''
         Worker that helps for counting input output ratio of topic
@@ -215,7 +215,12 @@ class InputOutputRatioWorker(MasterObserver):
                     self._logger.info(f"Ratio between topic {target_topic} and {source_topic} is: {throughput_ratio}")
                     if throughput_ratio < self._input_output_ratio_threshold:
                         self._logger.info(f"{throughput_ratio} is less than threshold: {self._input_output_ratio_threshold}")
-                        await self._below_threshold_callback(source_topic, source_topic_throughput/self._refresh_rate_second, target_topic)
+                        await self._below_threshold_callback(
+                            source_topic,
+                            source_topic_throughput/self._refresh_rate_second,
+                            target_topic,
+                            target_topic_throughput/self._refresh_rate_second
+                        )
             
             self._flush()
             
