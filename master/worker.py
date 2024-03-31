@@ -135,7 +135,6 @@ class ProfillingWorker(MasterObserver):
         while not self._stop:
             try:
                 await asyncio.sleep(1)            
-                self._fogverse_logger.std_log(self._topics_current_count)
                 for topic, topic_current_count in self._topics_current_count:
                     log = self._csv_message({
                         "topic" : topic,

@@ -2,7 +2,6 @@ from asyncio import StreamReader
 
 import os
 import time
-from uuid import uuid4
 
 from logging import Logger
 from collections.abc import Callable, Coroutine
