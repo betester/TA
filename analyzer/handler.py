@@ -103,10 +103,9 @@ class AnalyzerProducer(Consumer, Producer):
         return result
 
 class ParallelAnalyzerJobService:
-    def __init__(self, runnable: ParallelRunnable, producer_observer: ProducerObserver):
+    def __init__(self, runnable: ParallelRunnable):
         self.runnable = runnable
-        self.producer_observer = producer_observer
 
     def start(self):
-        self.runnable.run(self.producer_observer.send_total_successful_messages)
+        self.runnable.run()
 

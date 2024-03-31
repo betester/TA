@@ -1,1 +1,0 @@
-[2024-01-20 22:05:22,037][FOGV_FILE][file_Manager_70c666_1f295960-8b39-4647-b825-85c3eff2dbae] Initiating Manager with config: {'loop': <ProactorEventLoop running=True closed=False debug=False>, 'client_id': 'DESKTOP-AEEILS7', 'bootstrap_servers': 'localhost'}

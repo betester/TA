@@ -1,8 +1,7 @@
-from asyncio import StreamReader, Task
+from asyncio import StreamReader
 
 import os
 import time
-from uuid import uuid4
 
 from logging import Logger
 from collections.abc import Callable, Coroutine
@@ -17,11 +16,12 @@ from confluent_kafka.admin import (
     NewTopic
 )
 from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
-from asyncio.subprocess import PIPE, STDOUT, Process 
+from asyncio.subprocess import PIPE, STDOUT 
 from confluent_kafka import Consumer, KafkaException, Message, TopicCollection
 from fogverse.fogverse_logging import get_logger
 from fogverse.util import get_timestamp
 from master.contract import (
+    DeployArgs,
     DeployResult, 
     InputOutputThroughputPair, 
     MachineConditionData, 
@@ -323,7 +323,7 @@ class DeployScripts:
         except Exception as e:
             self._logger.error(f"An error occurred while writing logs: {e}")
     
-    async def _local_deployment(self, configs: TopicDeploymentConfig) -> DeployResult:
+    async def _local_deployment(self, configs: TopicDeploymentConfig, logger: Logger) -> DeployResult:
 
         cmd = f'python -m {configs.service_name}'
         self._logger.info(f"Running script: {cmd}")
@@ -392,6 +392,8 @@ class AutoDeployer(MasterObserver):
         await asyncio.sleep(self._deploy_delay)
         self._can_deploy_topic[topic_id].can_be_deployed = True
 
+    def get_topic_total_machine(self, topic: str) -> int:
+        return self._topic_total_deployment.get(topic, 0)
 
     def on_receive(self, data: InputOutputThroughputPair | MachineConditionData):
         if isinstance(data, MachineConditionData):
@@ -407,8 +409,12 @@ class AutoDeployer(MasterObserver):
     async def start(self):
         pass
     
-    async def deploy(self, source_topic: str, source_total_calls: float, target_topic: str) -> bool:
+    async def deploy(self, deploy_args: DeployArgs) -> bool:
         try:
+
+            target_topic, source_topic = deploy_args.target_topic, deploy_args.source_topic  
+            target_total_calls, source_total_calls = deploy_args.target_topic_throughput, deploy_args.source_topic_throughput
+
             if target_topic not in self._can_deploy_topic:
                 self._logger.info(f"Topic {target_topic} does not exist, might be not sending heartbeat during initial start or does not have deployment configs")
                 return False
@@ -434,7 +440,10 @@ class AutoDeployer(MasterObserver):
                     )
                     return False
 
-                if self._should_be_deployed(source_topic, source_total_calls):
+                source_topic_is_not_spike = self._should_be_deployed(source_topic, source_total_calls)
+                target_topic_is_not_spike = self._should_be_deployed(target_topic, target_total_calls) 
+
+                if source_topic_is_not_spike and target_topic_is_not_spike:
                     self._logger.info(f"Deploying new machine for service {service_name} to cloud provider: {provider}")
 
                     machine_deployer = self._deploy_scripts.get_deploy_functions(
@@ -485,7 +494,6 @@ class TopicSpikeChecker:
         z_score = (topic_throughput - mean)/std
 
         self._logger.info(f"Topic {topic_id} statistics:\nMean: {mean}\nStandard Deviation: {std}\nZ-Score:{z_score}")
-        #TODO: put explanation probably whether it's most likely can be deployed or not
             
         self._logger.info(f"{z_score < z_threshold}")
         return z_score < z_threshold
