@@ -1,5 +1,6 @@
 
 import logging
+from traceback import print_exc
 
 from collections.abc import Callable, Coroutine
 from typing import Any
@@ -135,19 +136,20 @@ class ProfillingWorker(MasterObserver):
         while not self._stop:
             try:
                 await asyncio.sleep(1)            
-                for topic, topic_current_count in self._topics_current_count:
+                for topic, topic_current_count in self._topics_current_count.items():
                     log = self._csv_message({
                         "topic" : topic,
                         "topic_throughput_per_second" : topic_current_count,
                         "topic_machine_deployed" : str(self._total_machine_deployed(topic))
                     })
 
+                    self._fogverse_logger.std_log(log)
                     self._fogverse_logger.csv_log(log)
 
                 self._flush()
 
-            except Exception as e:
-                self._fogverse_logger.std_log(e)
+            except Exception:
+                self._fogverse_logger.std_log(print_exc())
 
 
     async def stop(self):
