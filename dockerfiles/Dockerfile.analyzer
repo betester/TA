@@ -4,7 +4,7 @@ WORKDIR /app
 COPY analyzer ./analyzer
 COPY master ./master
 COPY fogverse ./fogverse
-COPY crawler ./crawler
+COPY model ./model
 COPY requirements/analyzer.txt ./
 COPY scripts ./scripts
 
