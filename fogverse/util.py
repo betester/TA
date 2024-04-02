@@ -1,5 +1,4 @@
 import base64
-import cv2
 import inspect
 import numpy as np
 import os
@@ -104,6 +103,7 @@ def get_header(headers, key, default=None, decoder=None):
     return default
 
 def _encode(img, encoding, *args):
+    import cv2
     _, encoded = cv2.imencode(f'.{encoding}', img, *args)
     return encoded
 
@@ -112,6 +112,7 @@ def compress_encoding(img, encoding, *args):
     return numpy_to_bytes(encoded)
 
 def _decode(img):
+    import cv2
     return cv2.imdecode(img, cv2.IMREAD_COLOR)
 
 def recover_encoding(img_bytes):
