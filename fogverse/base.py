@@ -4,7 +4,6 @@ from collections.abc import Callable
 from confluent_kafka import Message
 import asyncio
 import numpy as np
-import cv2
 
 from .util import bytes_to_numpy, numpy_to_bytes, compress_encoding
 from pickle import UnpicklingError
@@ -21,6 +20,7 @@ class AbstractConsumer:
         raise NotImplementedError
 
     def decode(self, data):
+        import cv2
         if not getattr(self, 'auto_decode', True):
             return data
         # if the consumer is a ConsumerStorage

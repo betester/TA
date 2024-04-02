@@ -29,7 +29,6 @@ huggingface-hub==0.21.4
 idna==3.6
 msgpack==1.0.8
 numpy==1.26.4
-opencv-python-headless==4.9.0.80
 packaging==24.0
 proto-plus==1.23.0
 protobuf==4.25.3

@@ -9,7 +9,6 @@ fsspec==2024.2.0
 huggingface-hub==0.21.4
 idna==3.6
 numpy==1.26.4
-opencv-python-headless==4.9.0.80
 packaging==23.2
 pydantic==2.6.3
 pydantic_core==2.16.3
