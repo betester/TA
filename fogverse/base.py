@@ -20,9 +20,9 @@ class AbstractConsumer:
         raise NotImplementedError
 
     def decode(self, data):
-        import cv2
         if not getattr(self, 'auto_decode', True):
             return data
+        import cv2
         # if the consumer is a ConsumerStorage
         if getattr(self, 'consumer', None) is not None and \
             'ConsumerStorage' in \
