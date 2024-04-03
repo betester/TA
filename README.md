@@ -16,6 +16,14 @@ Partition in kafka are usually set up statically before using it, we can set it 
 
 You can use `ConsumerAutoScaler` class from `master` module. This class is a helper class that will automatically increment partition of a topic.
 
+Before using it, you need to set up a few environment variables.
+
+- **KAFKA_ADMIN_HOST**
+  - *Description*:  The host of kafka endpoint. 
+  - *Default Value*: localhost
+
+- **SLEEP_TIME (optional)**
+  - *Description*: Defines the delay for retrying partition creation.
 
 ```py
 # instantiate consumer auto scaler class
@@ -47,7 +55,7 @@ There is a limitation on the auto scaler, it needs to have `consumer group` with
 
 Consider the case below.
 
-```
+```py
 Consumer Group Topics = {A, B}
 A partitions = 1 
 B partitions = 2
@@ -83,48 +91,105 @@ You need to send data to master so that master can know the throughput of your t
 
 ### Using Master Component
 
-If your are using master component, the following arguments are required on your virtual environment.
+You need to inject the following variables into your environment variables.
 
-**OBSERVER_CONSUMER_TOPIC : string**
+- **OBSERVER_CONSUMER_TOPIC**
+  - *Description*: Defines the topic that the master will listen to.
+  - *Default Value*: observer
 
----
-it defines the topic that the master will listen to, by default it will use observer.
+- **OBSERVER_CONSUMER_SERVERS**
+  - *Description*: The Kafka server that the master will use.
 
-**OBSERVER_CONSUMER_SERVERS : string**
+- **OBSERVER_CONSUMER_GROUP_ID (optional)**
+  - *Description*: The consumer group ID for the Kafka consumer.
 
----
-The kafka server that the master will use.
+- **DEPLOY_DELAY (optional)**
+  - *Description*: Sets up a delay in seconds after a machine has deployed.
+  - *Default Value*: 60 seconds
 
-**OBSERVER_CONSUMER_GROUP_ID (optional) : string**
+- **Z_VALUE (optional)**
+  - *Description*: Used to detect whether the low ratio is the effect of a spike.
+  - *Default Value*: 3
 
----
+- **WINDOW_MAX_SECOND (optional)**
+  - *Description*: Sets the duration in seconds for statistic count on the master.
+  - *Default Value*: 300 seconds (5 minutes)
 
-**DEPLOY_DELAY (optional): int** 
+- **INPUT_OUTPUT_RATIO_THRESHOLD (optional)**
+  - *Description*: Sets the ratio threshold between input and output throughput.
+  - *Default Value*: 0.8 (between 0 and 1)
 
----
-Once a machine has deployed, it will set up a delay in seconds. By default it will delay for 1 minute.
+After injecting the environment variables, you can use it as follows
 
-**Z_VALUE (optional): float**
-
----
-Z value will be used to detect whether the low ratio is the effect of spike, by default the value will be 3.
-
-**WINDOW_MAX_SECOND (optional): int**
-
----
-On the master, there will be statistic count which will collect the data in N seconds. by default it will collect data from the last 5 minutes.
-
-**INPUT_OUTPUT_RATIO_THRESHOLD (optional): float (between 0 and 1)**
-
----
-
-The ratio between IO throughput by default it will set to 0.8
-
+```py
+master_component = MasterComponent()
+event_handler = master_component.master_event_handler()
+await event_handler.run()
+```
 
 ### Using Master
 
-TODO
+If you want to customize your own master implementation, for example exclude or include your own implementation of worker on the master, you can create your own master class.
 
+```py
+master = Master(
+            consumer_topic=consumer_topic,
+            consumer_group_id=consumer_group_id,
+            consumer_servers=consumer_servers,
+            observers=workers
+        )
+
+await master.run()
+```
+
+You don't have to inject all of the environment above from the master component, instead you define your own environment variables. The important part is the implementation of workers, the workers need to implement the interface `MasterObserver`.
 
 ### Sending Out Information to Master
-TODO
+
+> 🚧 Prerequisite
+> 
+> You have to make sure that you already have master running on the background 
+> otherwise the data will not be received.
+
+Each node, especially producer node need to send out the data to  master for profilling purposes. To do that, you can use the `ProducerObserver` class. You can use it as follows,
+
+```py
+master_component = MasterComponent()
+producer_observer = master_component.producer_observer()
+
+## your producer class
+producer = Producer(producer_observer)
+```
+
+You also need to inject environment variables as well with the following arguments.
+
+- **OBSERVER_TOPIC**
+  - *Description*: Defines the topic that the master will listen to.
+  - *Default Value*: observer
+
+Then, inside the producer class, you can use it on either `_start` or `send` method. 
+
+On `_start` method, you need to call `send_input_output_ratio_pair` function. This will send data to master. As of current research, it is mainly used for deployment but you can instead override it to something else.
+
+One usage example:
+
+```py
+await self._observer.send_input_output_ratio_pair(
+    source_topic=self.consumer_topic,
+    target_topic=self.producer_topic,
+    topic_configs=self._topic_deployment_config,
+    send = lambda topic, converted_value: self.producer.send(topic=x, value=converted_value)
+)
+```
+
+On `send` method you need to tell how much message has been consumed by calling `send_total_successful_messages`. Here is how you would use it,
+
+```py
+result = await super().send(data, topic, key, headers, callback)
+await self._observer.send_total_successful_messages(
+    target_topic=self.producer_topic,
+    send = lambda x, y: self.producer.send(topic=x, value=y),
+    total_messages = 1
+)
+return result
+```
