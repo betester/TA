@@ -3,6 +3,7 @@ import asyncio
 from discord_bot.producer import DiscordProducer
 from discord_bot.bot import DiscordClient
 from fogverse.util import get_config
+from master import MasterComponent
 
 TOKEN = str(get_config('TOKEN', None, ''))
 
@@ -13,10 +14,12 @@ async def main():
     For syncing messages accross the two, use a queue.
     '''
     messages = asyncio.Queue()
-    intents = discord.Intents.all()
+    observer = MasterComponent().producer_observer()
 
-    discord_producer = DiscordProducer(messages)
+    intents = discord.Intents.all()
+    discord_producer = DiscordProducer(messages, observer)
     discord_client = DiscordClient(intents, messages, discord_producer)
+    
 
     await discord_client.start(TOKEN)
 

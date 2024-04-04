@@ -6,6 +6,7 @@ COPY fogverse ./fogverse
 COPY master ./master
 COPY model ./model
 COPY requirements/client.txt ./
+COPY scripts ./scripts
 
 RUN pip install -r client.txt
 

@@ -1,9 +1,6 @@
-
 from aiokafka.client import asyncio
-from fogverse import Consumer, Profiling
+from fogverse import Consumer
 from master.component import MasterComponent
-from master.master import ConsumerAutoScaler
-from confluent_kafka.admin import AdminClient
 
 
 class Client(Consumer):
