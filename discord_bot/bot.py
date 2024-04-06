@@ -23,7 +23,7 @@ class DiscordClient(discord.Client):
             # usage $start <delay>
             try:
                 delay = message.content.split(" ")[1]
-                self.delay = int(delay)
+                self.delay = float(delay)
                 self.loop.create_task(
                     self.mock_send()
                 )
