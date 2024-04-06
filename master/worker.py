@@ -133,7 +133,7 @@ class ProfillingWorker(MasterObserver):
 
         while not self._stop:
             try:
-                await asyncio.sleep(1)            
+                await asyncio.sleep(60)            
                 for topic, topic_current_count in self._topics_current_count.items():
                     log = self._csv_message({
                         "topic" : topic,
