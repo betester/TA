@@ -4,8 +4,9 @@ from discord_bot.producer import DiscordProducer
 from discord_bot.bot import DiscordClient
 from fogverse.util import get_config
 from master import MasterComponent
+import os
 
-TOKEN = str(get_config('TOKEN', None, ''))
+TOKEN = os.getenv("DISCORD_TOKEN", "")
 
 async def main():
     '''
