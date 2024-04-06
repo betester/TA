@@ -210,6 +210,7 @@ class InputOutputRatioWorker(MasterObserver):
 
                     if throughput_ratio == target_topic_throughput:
                         self._logger.info(f"Source topic {source_topic} throughput is {source_topic_throughput}, the machine might be dead")
+                        return 
 
                     self._logger.info(f"Ratio between topic {target_topic} and {source_topic} is: {throughput_ratio}")
                     if throughput_ratio < self._input_output_ratio_threshold:
