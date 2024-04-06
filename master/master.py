@@ -264,6 +264,19 @@ class ProducerObserver:
                 )
             )
     
+    async def send_total_successful_messages_async(
+            self,
+            target_topic: str,
+            total_messages: int,
+            send: Callable[[str, bytes], Any]
+        ):
+        if target_topic is not None:
+            data = self._success_timestamp_data_format(target_topic, total_messages)
+            return await send(
+                self._producer_topic,
+                data
+            )
+
     def send_total_successful_messages(
             self,
             target_topic: str,
@@ -400,6 +413,9 @@ class AutoDeployer(MasterObserver):
             return
         
         if data.deploy_configs:
+            if data.deploy_configs.topic_id in self._topic_deployment_configs:
+                return 
+
             self._topic_deployment_configs[data.deploy_configs.topic_id] = data.deploy_configs
             self._can_deploy_topic[data.deploy_configs.topic_id] = TopicDeployDelay(
                 can_be_deployed=True,
@@ -427,7 +443,7 @@ class AutoDeployer(MasterObserver):
                     return False
             
                 maximum_topic_deployment = self._topic_deployment_configs[target_topic].max_instance
-                current_deployed_replica = self._topic_total_deployment.get(target_topic, 0)
+                current_deployed_replica = self._topic_total_deployment.get(target_topic, 1)
 
                 service_name = self._topic_deployment_configs[target_topic].service_name
                 provider = self._topic_deployment_configs[target_topic].provider

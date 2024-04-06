@@ -95,9 +95,9 @@ class AnalyzerProducer(Consumer, Producer):
 
     async def send(self, data, topic=None, key=None, headers=None, callback=None):
         result = await super().send(data, topic, key, headers, callback)
-        await self._observer.send_total_successful_messages(
+        await self._observer.send_total_successful_messages_async(
             target_topic=self.producer_topic,
-            send = lambda x, y: self.producer.send(topic=x, value=y),
+            send = lambda x, y: await self.producer.send(topic=x, value=y),
             total_messages = 1
         )
         return result
