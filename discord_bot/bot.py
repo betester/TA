@@ -53,6 +53,8 @@ class DiscordClient(discord.Client):
         
     async def mock_send(self):
         csv_paths = [os.path.join('./data/crawler/kaggle', file) for file in os.listdir('./data/crawler/kaggle') if file.endswith('.csv')]
+        if self.delay is None:
+            return
         for csv_path in csv_paths:
             with open(csv_path, 'r') as csv_file:
                 res = csv.reader(csv_file)
