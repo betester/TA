@@ -2,8 +2,7 @@ import discord
 import asyncio
 from discord_bot.producer import DiscordProducer
 from discord_bot.bot import DiscordClient
-from fogverse.util import get_config
-from master import MasterComponent
+from master.component import MasterComponent
 import os
 
 TOKEN = os.getenv("DISCORD_TOKEN", "")
