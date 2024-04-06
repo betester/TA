@@ -4,7 +4,6 @@ from model.crawler_contract import CrawlerResponse
 from fogverse.util import get_config
 import socket
 
-
 class DiscordProducer(Producer, Profiling):
     def __init__(self, messages, producer_observer):
         self.producer_topic = str(get_config("DISCORD_PRODUCER_TOPIC", self, "analyze_v1"))
@@ -42,4 +41,3 @@ class DiscordProducer(Producer, Profiling):
             total_messages = 1
         )
         return result
-

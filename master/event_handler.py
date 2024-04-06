@@ -50,5 +50,3 @@ class Master(Consumer):
             await observer.stop()
 
         await super().close_consumer()
-
-

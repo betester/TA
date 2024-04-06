@@ -31,7 +31,6 @@ class StatisticWorker(MasterObserver, TopicStatistic):
 
         self._stop = False
 
-    
     def on_receive(self, data: InputOutputThroughputPair | MachineConditionData):
         if isinstance(data, InputOutputThroughputPair):
             return
@@ -48,7 +47,6 @@ class StatisticWorker(MasterObserver, TopicStatistic):
 
         observed_counts.append(total_counts)
         self._topics_observed_counts[topic] = observed_counts
-
 
     async def start(self):
         self._logger.info("Starting statistic worker")

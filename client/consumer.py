@@ -5,8 +5,6 @@ from model.analyzer_contract import DisasterAnalyzerResponse
 from client.notif_client import NotificationClient
 import os
 
-
-
 class NotificationConsumer(Consumer):
     def __init__(self, notification_client: NotificationClient):
         self.consumer_topic = str(get_config("NOTIF_CONSUMER_TOPIC", self, "client_v6"))
