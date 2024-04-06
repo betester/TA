@@ -1,4 +1,3 @@
-
 from abc import ABC, abstractmethod
 import asyncio
 from asyncio.locks import Lock
@@ -7,7 +6,6 @@ from datetime import datetime
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict
-
 
 class Master(ABC):
 
@@ -32,7 +30,6 @@ class TopicDeploymentConfig(BaseModel):
     machine_type: str
     provider: str
 
-#TODO: rename this into something else
 class InputOutputThroughputPair(BaseModel):
     source_topic: str
     target_topic: str
@@ -50,11 +47,9 @@ class DeployArgs(BaseModel):
     target_topic: str
     target_topic_throughput: float
 
-
 class DeployResult(BaseModel):
     machine_id: str
     shut_down_machine: Callable[[], Coroutine[Any, Any, bool]] 
-
 
 class MasterObserver(ABC):
 
@@ -75,7 +70,6 @@ class TopicStatistic(ABC):
     @abstractmethod
     def get_topic_mean(self, topic: str) -> float:
         pass 
-
 
     @abstractmethod
     def get_topic_standard_deviation(self, topic: str) -> float:

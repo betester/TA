@@ -44,7 +44,6 @@ class ConsumerAutoScaler:
 
         self._logger = get_logger(name=self.__class__.__name__)
     
-
     def _group_id_total_consumer(self, group_id: str) -> int:
         group_future_description = self._kafka_admin.describe_consumer_groups([group_id])[group_id]
         group_description: ConsumerGroupDescription = group_future_description.result()
@@ -55,7 +54,6 @@ class ConsumerAutoScaler:
         topic_description: TopicDescription = topic_future_description.result()
         return len(topic_description.partitions)
     
-
     def _add_partition_on_topic(self, topic_id: str, new_total_partition: int):
         future_partition = self._kafka_admin.create_partitions([NewPartitions(topic_id, new_total_partition)])[topic_id]
 
@@ -176,7 +174,6 @@ class ConsumerAutoScaler:
             except Exception as e:
                 self._logger.info(e)
 
-
     def on_revoke(self, consumer, partitions):
         #TODO: handle if needed in the future
         self._logger.info("Got revoked")
@@ -227,16 +224,13 @@ class ConsumerAutoScaler:
                 except Exception as e:
                     self._logger.info(e)
 
-                    
                 await asyncio.sleep(self._sleep_time)
             
-
             while len(consumer.assignment()) == 0:
                 self._logger.info("No partition assigned for retrying")
                 consumer.unsubscribe()
                 consumer.subscribe([consumer_topic])
                 await asyncio.sleep(self._sleep_time)
-
 
             self._logger.info("Successfully assigned, consuming")
             await consumer.seek_to_end()
@@ -246,7 +240,6 @@ class ProducerObserver:
     def __init__(self, producer_topic: str):
         self._producer_topic = producer_topic 
         self._logger = get_logger(name=self.__class__.__name__)
-
 
     def send_input_output_ratio_pair(self, source_topic: str, target_topic: str, topic_configs: TopicDeploymentConfig, send: Callable[[str, bytes], Any]):
         '''
@@ -355,7 +348,6 @@ class DeployScripts:
             except Exception as e:
                 self._logger.error(f"Fail shutting down process {process.pid}, please turn off them manually", e)
                 return False
-
             
         if process.stdout:
             log_file_name = f'{configs.service_name}-{process.pid}.log'
@@ -368,7 +360,7 @@ class DeployScripts:
             ) 
 
         raise Exception("Process cannot be created")
-
+    
 class AutoDeployer(MasterObserver):
 
     def __init__(
@@ -513,4 +505,3 @@ class TopicSpikeChecker:
             
         self._logger.info(f"{z_score < z_threshold}")
         return z_score < z_threshold
-

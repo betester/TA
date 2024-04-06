@@ -19,6 +19,5 @@ async def main():
     elif mode == "serial":
         await analyzer_component.disaster_analyzer(consumer_auto_scaler, producer_observer).run()
         
-
 if __name__ == "__main__":
     asyncio.run(main())

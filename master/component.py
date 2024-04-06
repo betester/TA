@@ -11,16 +11,12 @@ from functools import partial
 
 from master.worker import InputOutputRatioWorker, ProfillingWorker, StatisticWorker
 from scripts.local_deploy import deploy_instance_with_process
-
-
-
 class MasterComponent:
 
     def consumer_auto_scaler(self):
         
         bootstrap_host = str(get_config("KAFKA_ADMIN_HOST", self, "localhost"))
         sleep_time = int(str(get_config("SLEEP_TIME", self, 3)))
-
 
         kafka_admin=AdminClient(
             conf={
@@ -57,7 +53,6 @@ class MasterComponent:
 
         return f"./{config_file_name}"
 
-
     async def google_deployment(self, topic_deployment_config: TopicDeploymentConfig, logger: Logger) -> DeployResult:
         
         random_unique_id = uuid4()
@@ -79,7 +74,6 @@ class MasterComponent:
             topic_deployment_config.machine_type
         )
 
-
         if process.stdout:
             async for line in process.stdout:
                 logger.info(line.decode('utf-8'))
@@ -93,8 +87,6 @@ class MasterComponent:
             machine_id=machine_id, 
             shut_down_machine=shutdown_google_cloud_instance
         )
-
-
 
     def master_event_handler(self):
         consumer_topic = str(get_config("OBSERVER_CONSUMER_TOPIC", self, "observer"))
@@ -136,4 +128,3 @@ class MasterComponent:
             consumer_servers=consumer_servers,
             observers=workers
         )
-

@@ -1,4 +1,3 @@
-
 from model.analyzer_contract import DisasterAnalyzer
 from typing import Optional, Tuple
 from transformers import BertTokenizer, BertForSequenceClassification
@@ -7,7 +6,6 @@ from fogverse.fogverse_logging import get_logger
 
 import torch
 import torch.nn.functional as F
-
 
 class DisasterAnalyzerImpl(DisasterAnalyzer):
 
