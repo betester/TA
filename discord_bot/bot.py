@@ -19,6 +19,18 @@ class DiscordClient(discord.Client):
         if message.author == self.user:
             return
         
+        if message.content == '$help':
+            # send embed message
+            embed = discord.Embed(
+                title="Help",
+                description="Commands",
+                color=discord.Color.blue()
+            )
+            embed.add_field(name="$start <delay>", value="Start sending messages with delay (seconds)", inline=False)
+            embed.footer = "Jigglypuff Bot v1.0"
+            await message.channel.send(embed=embed)
+            return
+
         if message.content.startswith('$start'):
             # usage $start <delay>
             try:
@@ -30,10 +42,6 @@ class DiscordClient(discord.Client):
             except:
                 self.delay = None
 
-        elif message.content == '$stop':
-            # usage $stop
-            self.delay = None
-
         else:
             self.__log.info(f"Message from {message.author}: {message.content}")
             await self.messages.put(message.content)
@@ -44,6 +52,9 @@ class DiscordClient(discord.Client):
         )
         
     async def mock_send(self):
+        if self.delay is None:
+            return
+            
         csv_paths = [os.path.join('./data/crawler/kaggle', file) for file in os.listdir('./data/crawler/kaggle') if file.endswith('.csv')]
         for csv_path in csv_paths:
             with open(csv_path, 'r') as csv_file:
