@@ -20,7 +20,6 @@ async def main():
     discord_producer = DiscordProducer(messages, observer)
     discord_client = DiscordClient(intents, messages, discord_producer)
     
-
     await discord_client.start(TOKEN)
 
 if __name__ == "__main__":
