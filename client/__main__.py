@@ -3,11 +3,16 @@ import firebase_admin
 from firebase_admin import credentials
 from client.notif_client import NotificationClient
 from client.consumer import NotificationConsumer
+import os
+import json
 
-DEVICE_TOKENS = [""]
+DEVICE_TOKENS = os.environ.get("DEVICE_TOKENS", "").split(",")
 
 if __name__ == "__main__":
-    cred = credentials.Certificate("./firebase-key.json")
+    # get key from env variable
+    key = json.loads(os.environ.get("FIREBASE_KEY"))
+
+    cred = credentials.Certificate(key)
     firebase_admin.initialize_app(cred)
 
     client = NotificationClient(device_tokens=DEVICE_TOKENS)

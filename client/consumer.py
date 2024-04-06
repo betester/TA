@@ -3,9 +3,9 @@ from fogverse.fogverse_logging import get_logger
 from fogverse.util import get_config
 from model.analyzer_contract import DisasterAnalyzerResponse
 from client.notif_client import NotificationClient
+import os
 
 
-DEVICE_TOKENS = [""]
 
 class NotificationConsumer(Consumer):
     def __init__(self, notification_client: NotificationClient):
