@@ -11,12 +11,11 @@ class DiscordProducer(Producer, Profiling):
         self.group_id = str(get_config("DISCORD_CONSUMER_GROUP_ID", self, "crawler"))
         self.messages = messages
         self._closed = False
+        self.auto_decode = False
         self._observer = producer_observer
         self.client_id = socket.gethostname()
         Producer.__init__(self)
         Profiling.__init__(self, name='discord-logs', dirname='discord-logs')
-
-    def encode(self, data: CrawlerResponse) -> bytes:
         return data.model_dump_json().encode()
 
     async def receive(self):
