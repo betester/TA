@@ -273,8 +273,8 @@ class ProducerObserver:
         if target_topic is not None:
             data = self._success_timestamp_data_format(target_topic, total_messages)
             return await send(
-                self._producer_topic,
-                data
+                topic=self._producer_topic,
+                value=data
             )
 
     def send_total_successful_messages(
