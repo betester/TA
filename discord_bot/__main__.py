@@ -5,7 +5,7 @@ from discord_bot.bot import DiscordClient
 from master.component import MasterComponent
 import os
 
-TOKEN = os.getenv("DISCORD_TOKEN", "")
+TOKEN = str(os.getenv("DISCORD_TOKEN", ""))
 
 async def main():
     '''
