@@ -16,8 +16,12 @@ async def deploy_instance_with_process(
     container_env: str,
     machine_type: str = "CPU"
     ):
-    
-    deploy_script_resource = "create_cpu_instance.sh" if machine_type == "CPU" else "create_gpu_instance.sh"
+
+    if service_name == "analyzer":
+        deploy_script_resource = "create_cpu_for_analyzer.sh" if machine_type == "CPU" else "create_gpu_instance.sh"
+    else:
+        deploy_script_resource = "create_cpu_instance.sh" if machine_type == "CPU" else "create_gpu_instance.sh"
+
     cmd = f"./scripts/{deploy_script_resource} {service_name} {project_name} {zone} {service_account} '{container_env}' {image_name}"
 
     process = await asyncio.create_subprocess_shell(
@@ -39,8 +43,13 @@ async def deploy_instance(
     container_env: str,
     machine_type: str = "CPU"
     ):
-    
-    deploy_script_resource = "create_cpu_instance.sh" if machine_type == "CPU" else "create_gpu_instance.sh"
+
+    service_name = service_name.replace("_", "-")
+
+    if service_name == "analyzer":
+        deploy_script_resource = "create_cpu_for_analyzer.sh" if machine_type == "CPU" else "create_gpu_instance.sh"
+    else:
+        deploy_script_resource = "create_cpu_instance.sh" if machine_type == "CPU" else "create_gpu_instance.sh"
     cmd = f"./scripts/{deploy_script_resource} {service_name} {project_name} {zone} {service_account} '{container_env}' {image_name}"
 
     process = await asyncio.create_subprocess_shell(
@@ -94,7 +103,7 @@ async def main():
         },
     }
 
-    current_config = ["kafka"]
+    current_config = ["discord_bot"]
 
     while len(current_config) != 0:
 
