@@ -501,9 +501,9 @@ class AutoDeployer(MasterObserver):
                     self._machine_ids.append(deploy_result)
                     self._can_deploy_topic[target_topic].can_be_deployed = False
                     self._can_deploy_topic[target_topic].deployed_timestamp = current_time
-                    task = asyncio.create_task(self.delay_deploy(target_topic,self._deploy_delay))
+                    task = asyncio.create_task(self.delay_deploy(target_topic, self._deploy_delay))
                     self._delay_deploy_task[target_topic] = task
-                    self._topic_time_delay[target_topic] = current_time + timedelta(seconds=self._after_heartbeat_delay)
+                    self._topic_time_delay[target_topic] = current_time + timedelta(seconds=self._deploy_delay)
                     return True
             
                 self._logger.info("Machine should not be deployed, could be a spike")
