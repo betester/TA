@@ -1,4 +1,5 @@
-from asyncio import StreamReader
+from asyncio import StreamReader, Task
+from datetime import datetime, timedelta
 
 import os
 import time
@@ -367,7 +368,8 @@ class AutoDeployer(MasterObserver):
             self,
             deploy_script: DeployScripts,
             should_be_deployed : Callable[[str, float] ,bool],
-            deploy_delay: int
+            deploy_delay: int,
+            after_heartbeat_delay : int 
         ):
         """
         A class to facilitate the auto deployment process for each consumer topic.
@@ -385,6 +387,7 @@ class AutoDeployer(MasterObserver):
         self._deploy_scripts = deploy_script
         self._should_be_deployed = should_be_deployed
         self._deploy_delay = deploy_delay
+        self._after_heartbeat_delay = after_heartbeat_delay
 
         self._logger = get_logger(name=self.__class__.__name__)
         
@@ -392,13 +395,25 @@ class AutoDeployer(MasterObserver):
         self._machine_ids: list[DeployResult] = []
         self._can_deploy_topic: dict[str, TopicDeployDelay] = {}
         self._topic_total_deployment: dict[str, int] = {}
+        self._topic_time_delay : dict[str, datetime] = {}
 
-    async def delay_deploy(self, topic_id: str):
-        await asyncio.sleep(self._deploy_delay)
+        self._delay_deploy_task : dict[str, Task] = {}
+        self._after_heartbeat_delay_task : dict[str, Task] = {}
+
+    async def delay_deploy(self, topic_id: str, sleep_time : int):
+        await asyncio.sleep(sleep_time)
         self._can_deploy_topic[topic_id].can_be_deployed = True
 
     def get_topic_total_machine(self, topic: str) -> int:
-        return self._topic_total_deployment.get(topic, 0)
+        return self._topic_total_deployment.get(topic, 1)
+
+    def _cancel_topic_task_delay(self, topic : str, delay_tasks : dict[str, Task]):
+
+        if topic in delay_tasks:
+            delay_task = self._delay_deploy_task[topic] 
+
+            if not delay_task.done():
+                delay_task.cancel()
 
     def on_receive(self, data: InputOutputThroughputPair | MachineConditionData):
         if isinstance(data, MachineConditionData):
@@ -406,11 +421,21 @@ class AutoDeployer(MasterObserver):
         
         if data.deploy_configs:
             self._topic_deployment_configs[data.deploy_configs.topic_id] = data.deploy_configs
+            current_time = get_timestamp()
             if data.deploy_configs.topic_id not in self._can_deploy_topic:
                 self._can_deploy_topic[data.deploy_configs.topic_id] = TopicDeployDelay(
-                    can_be_deployed=True,
-                    deployed_timestamp=get_timestamp()
+                    can_be_deployed=False,
+                    deployed_timestamp=current_time
                 )
+
+            self._cancel_topic_task_delay(data.deploy_configs.topic_id, self._delay_deploy_task)
+            self._cancel_topic_task_delay(data.deploy_configs.topic_id, self._after_heartbeat_delay_task)
+
+            self._after_heartbeat_delay_task[data.deploy_configs.topic_id] = asyncio.create_task(
+                self.delay_deploy(data.deploy_configs.topic_id, self._after_heartbeat_delay)
+            )
+            self._topic_time_delay[data.deploy_configs.topic_id] = current_time + timedelta(seconds=self._after_heartbeat_delay)
+
             total_deployment = self._topic_total_deployment.get(data.deploy_configs.topic_id, 0)
             self._topic_total_deployment[data.deploy_configs.topic_id] = total_deployment + 1
 
@@ -430,7 +455,7 @@ class AutoDeployer(MasterObserver):
             async with self._can_deploy_topic[target_topic]._lock:
 
                 if not self._can_deploy_topic[target_topic].can_be_deployed:
-                    time_remaining = get_timestamp() - self._can_deploy_topic[target_topic].deployed_timestamp
+                    time_remaining = self._topic_time_delay[target_topic] - get_timestamp()
                     self._logger.info(f"Cannot be deployed yet, time remaining: {time_remaining}")
                     return False
             
@@ -471,10 +496,14 @@ class AutoDeployer(MasterObserver):
                         self._logger.error(f"Deployment failed for service {service_name}")
                         return False
 
+                    current_time = get_timestamp()
+
                     self._machine_ids.append(deploy_result)
                     self._can_deploy_topic[target_topic].can_be_deployed = False
-                    self._can_deploy_topic[target_topic].deployed_timestamp = get_timestamp()
-                    asyncio.create_task(self.delay_deploy(target_topic))
+                    self._can_deploy_topic[target_topic].deployed_timestamp = current_time
+                    task = asyncio.create_task(self.delay_deploy(target_topic,self._deploy_delay))
+                    self._delay_deploy_task[target_topic] = task
+                    self._topic_time_delay[target_topic] = current_time + timedelta(seconds=self._after_heartbeat_delay)
                     return True
             
                 self._logger.info("Machine should not be deployed, could be a spike")

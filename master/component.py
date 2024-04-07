@@ -92,12 +92,13 @@ class MasterComponent:
         consumer_topic = str(get_config("OBSERVER_CONSUMER_TOPIC", self, "observer"))
         consumer_servers = str(get_config("OBSERVER_CONSUMER_SERVERS", self, "localhost:9092"))
         consumer_group_id = str(get_config("OBSERVER_CONSUMER_GROUP_ID", self, "observer"))
-        deploy_delay = int(str(get_config("DEPLOY_DELAY", self, 60)))
+        deploy_delay = int(str(get_config("DEPLOY_DELAY", self, 900))) # 15 minutes over the next deployment
         z_value = int(str(get_config("Z_VALUE", self, 3)))
         window_max_second = int(str(get_config("WINDOW_MAX_SECOND", self, 300))) # 5 minutes default
         input_output_ratio_threshold = float(str(get_config("INPUT_OUTPUT_RATIO_THRESHOLD", self, 0.7)))
         input_output_refresh_rate = float(str(get_config("INPUT_OUTPUT_REFRESH_RATE", self, 60)))
-        profilling_time_window = int(str(get_config("INPUT_OUTPUT_REFRESH_RATE", self, 1)))
+        profilling_time_window = int(str(get_config("PROFILLING_TIME_WINDOW", self, 1)))
+        hearbeart_deploy_delay = int(str(get_config("HEARBEART_DEPLOY_DELAY", self, 120))) # 2 minutes after deployment happens
 
         statistic_worker = StatisticWorker(maximum_seconds=window_max_second)
         topic_spike_checker = TopicSpikeChecker(statistic_worker)
@@ -111,7 +112,8 @@ class MasterComponent:
         auto_deployer = AutoDeployer(
             deploy_script=deploy_script,
             should_be_deployed=partial(topic_spike_checker.check_spike_by_z_value, z_value),
-            deploy_delay=deploy_delay
+            deploy_delay=deploy_delay,
+            after_heartbeat_delay=hearbeart_deploy_delay
         )
         input_output_worker = InputOutputRatioWorker(
             refresh_rate_second=input_output_refresh_rate,
