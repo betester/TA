@@ -410,7 +410,7 @@ class AutoDeployer(MasterObserver):
     def _cancel_topic_task_delay(self, topic : str, delay_tasks : dict[str, Task]):
 
         if topic in delay_tasks:
-            delay_task = self._delay_deploy_task[topic] 
+            delay_task = delay_tasks[topic] 
 
             if not delay_task.done():
                 delay_task.cancel()
