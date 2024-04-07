@@ -16,7 +16,6 @@ class DiscordProducer(Producer, Profiling):
         self.client_id = socket.gethostname()
         Producer.__init__(self)
         Profiling.__init__(self, name='discord-logs', dirname='discord-logs')
-        return data.model_dump_json().encode()
 
     async def receive(self):
         try:
