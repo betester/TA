@@ -395,8 +395,6 @@ class AutoDeployer(MasterObserver):
 
     async def delay_deploy(self, topic_id: str):
         await asyncio.sleep(self._deploy_delay)
-        current_deployed_replica = self._topic_total_deployment.get(topic_id, 1)
-        self._topic_total_deployment[topic_id] = current_deployed_replica + 1
         self._can_deploy_topic[topic_id].can_be_deployed = True
 
     def get_topic_total_machine(self, topic: str) -> int:
@@ -407,14 +405,14 @@ class AutoDeployer(MasterObserver):
             return
         
         if data.deploy_configs:
-            if data.deploy_configs.topic_id in self._topic_deployment_configs:
-                return 
-
             self._topic_deployment_configs[data.deploy_configs.topic_id] = data.deploy_configs
-            self._can_deploy_topic[data.deploy_configs.topic_id] = TopicDeployDelay(
-                can_be_deployed=True,
-                deployed_timestamp=get_timestamp()
-            )
+            if data.deploy_configs.topic_id not in self._can_deploy_topic:
+                self._can_deploy_topic[data.deploy_configs.topic_id] = TopicDeployDelay(
+                    can_be_deployed=True,
+                    deployed_timestamp=get_timestamp()
+                )
+            total_deployment = self._topic_total_deployment.get(data.deploy_configs.topic_id, 0)
+            self._topic_total_deployment[data.deploy_configs.topic_id] = total_deployment + 1
 
     async def start(self):
         pass
