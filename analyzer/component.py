@@ -31,6 +31,7 @@ class AnalyzerComponent:
         self._image_name = str(get_config("IMAGE_NAME", self, "betester/analyzer:latest"))
         self._service_account = str(get_config("SERVICE_ACCOUNT", self, ""))
         self._kafka_admin_account = str(get_config("KAFKA_ADMIN_HOST", self, "localhost"))
+        self._analyzer_mode = str(get_config("ANALYZER_MODE", self, "parallel"))
 
         self._container_env = {
             "MACHINE_TYPE": self._machine_type,
@@ -48,7 +49,8 @@ class AnalyzerComponent:
             "SERVICE_NAME": self._service_name,
             "IMAGE_NAME" : self._image_name,
             "SERVICE_ACCOUNT" : self._service_account,
-            "KAFKA_ADMIN_HOST" : self._kafka_admin_account
+            "KAFKA_ADMIN_HOST" : self._kafka_admin_account,
+            "ANALYZER_MODE" : self._analyzer_mode
         }
 
 

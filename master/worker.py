@@ -92,9 +92,11 @@ class StatisticWorker(MasterObserver, TopicStatistic):
 
 class ProfillingWorker(MasterObserver):
 
-    def __init__(self, total_machine_deployed : Callable[[str], int]):
+    def __init__(self, total_machine_deployed : Callable[[str], int], profilling_time_window : int):
 
         self._total_machine_deployed = total_machine_deployed
+        self._profilling_time_window = profilling_time_window
+
         self.__headers = [
             "topic",
             "topic_throughput_per_second",
@@ -133,7 +135,7 @@ class ProfillingWorker(MasterObserver):
 
         while not self._stop:
             try:
-                await asyncio.sleep(60)            
+                await asyncio.sleep(self._profilling_time_window)            
                 for topic, topic_current_count in self._topics_current_count.items():
                     log = self._csv_message({
                         "topic" : topic,

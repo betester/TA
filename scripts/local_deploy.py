@@ -17,7 +17,7 @@ async def deploy_instance_with_process(
     machine_type: str = "CPU"
     ):
 
-    if service_name == "analyzer":
+    if service_name.startswith("analyzer"):
         deploy_script_resource = "create_cpu_for_analyzer.sh" if machine_type == "CPU" else "create_gpu_instance.sh"
     else:
         deploy_script_resource = "create_cpu_instance.sh" if machine_type == "CPU" else "create_gpu_instance.sh"
