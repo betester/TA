@@ -35,7 +35,7 @@ class CrawlerProducer(Producer, Profiling):
             # data: Optional[CrawlerResponse] = await self._crawler.crawl()
             # if data: 
             #     return data
-            await asyncio.sleep(0.1)
+            await asyncio.sleep(2)
             return CrawlerResponse(
                 message="H" * 255,
                 source="Me"
