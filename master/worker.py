@@ -98,7 +98,7 @@ class DynamicPartitionProfillingWorker(MasterObserver):
 
         self.current_consumer = 0
         self.expected_consumer = 0
-        self.current_parititon = 1
+        self.current_partition = 1
         self.profilling_time_window = profilling_time_window 
         self._stop = False
         self.admin_client = admin_client
@@ -139,15 +139,17 @@ class DynamicPartitionProfillingWorker(MasterObserver):
                 topic_future_description = self.admin_client.describe_topics(TopicCollection([self.topic]))[self.topic]
                 topic_description = topic_future_description.result()
                 self.current_partition = len(topic_description.partitions)
+                print(len(topic_description.partitions))
 
-
-                log = self._csv_message({
+                msg = {
                     "current_consumer" : self.current_consumer,
                     "expected_consumer" : self.expected_consumer,
-                    "current_partition" : self.current_parititon
-                })
+                    "current_partition" : self.current_partition
+                }
 
-                self._fogverse_logger.std_log(log)
+                log = self._csv_message(msg)
+
+                self._fogverse_logger.std_log(msg)
                 self._fogverse_logger.csv_log(log)
 
 

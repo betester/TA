@@ -14,16 +14,9 @@ from scripts.local_deploy import deploy_instance_with_process
 
 class MasterComponent:
 
-    def consumer_auto_scaler(self):
+    def consumer_auto_scaler(self, kafka_admin):
         
-        bootstrap_host = str(get_config("KAFKA_ADMIN_HOST", self, "localhost"))
         sleep_time = int(str(get_config("SLEEP_TIME", self, 3)))
-
-        kafka_admin=AdminClient(
-            conf={
-                "bootstrap.servers": bootstrap_host
-            },
-        )
 
         return ConsumerAutoScaler(
             kafka_admin=kafka_admin,
@@ -132,11 +125,11 @@ class MasterComponent:
             observers=workers
         )
     
-    def dynamic_partition_master_observer(self, topic: str, admin_client : AdminClient, profilling_time_window: int):
+    def dynamic_partition_master_observer(self, topic: str, admin_client : AdminClient, profilling_time_window: int, group_id : str):
 
         consumer_topic = str(get_config("OBSERVER_CONSUMER_TOPIC", self, "observer"))
         consumer_servers = str(get_config("OBSERVER_CONSUMER_SERVERS", self, "localhost:9092"))
-        consumer_group_id = str(get_config("OBSERVER_CONSUMER_GROUP_ID", self, "observer"))
+        consumer_group_id =group_id 
 
         dynamic_partition_worker = DynamicPartitionProfillingWorker(
             profilling_time_window,
