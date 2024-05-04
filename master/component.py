@@ -3,14 +3,15 @@ from os import chmod
 from uuid import uuid4
 from logging import Logger
 from fogverse.util import get_config
-from master.contract import DeployResult, TopicDeploymentConfig
+from master.contract import DeployResult, MasterObserver, TopicDeploymentConfig
 from master.event_handler import Master
 from master.master import AutoDeployer, ConsumerAutoScaler, DeployScripts, ProducerObserver, TopicSpikeChecker
 from confluent_kafka.admin import AdminClient
 from functools import partial
 
-from master.worker import InputOutputRatioWorker, ProfillingWorker, StatisticWorker
+from master.worker import DynamicPartitionProfillingWorker, InputOutputRatioWorker, ProfillingWorker, StatisticWorker
 from scripts.local_deploy import deploy_instance_with_process
+
 class MasterComponent:
 
     def consumer_auto_scaler(self):
@@ -130,3 +131,24 @@ class MasterComponent:
             consumer_servers=consumer_servers,
             observers=workers
         )
+    
+    def dynamic_partition_master_observer(self, topic: str, admin_client : AdminClient, profilling_time_window: int):
+
+        consumer_topic = str(get_config("OBSERVER_CONSUMER_TOPIC", self, "observer"))
+        consumer_servers = str(get_config("OBSERVER_CONSUMER_SERVERS", self, "localhost:9092"))
+        consumer_group_id = str(get_config("OBSERVER_CONSUMER_GROUP_ID", self, "observer"))
+
+        dynamic_partition_worker = DynamicPartitionProfillingWorker(
+            profilling_time_window,
+            admin_client,
+            topic
+        )
+        workers : list[MasterObserver] = [dynamic_partition_worker]
+
+        return Master(
+            consumer_topic=consumer_topic,
+            consumer_group_id=consumer_group_id,
+            consumer_servers=consumer_servers,
+            observers=workers
+        )
+

@@ -242,7 +242,7 @@ class ProducerObserver:
         self._producer_topic = producer_topic 
         self._logger = get_logger(name=self.__class__.__name__)
 
-    def send_input_output_ratio_pair(self, source_topic: str, target_topic: str, topic_configs: TopicDeploymentConfig, send: Callable[[str, bytes], Any]):
+    def send_input_output_ratio_pair(self, source_topic: str, target_topic: str, topic_configs: Optional[TopicDeploymentConfig], send: Callable[[str, bytes], Any]):
         '''
         Identify which topic pair should the observer ratio with
         send: a produce function from kafka
@@ -262,40 +262,43 @@ class ProducerObserver:
             self,
             target_topic: str,
             total_messages: int,
+            expected_consumer :int ,
             send: Callable[[str, bytes], Any]
         ):
         if target_topic is not None:
-            data = self._success_timestamp_data_format(target_topic, total_messages)
+            data = self._success_timestamp_data_format(target_topic, total_messages, expected_consumer)
             return await send(
-                topic=self._producer_topic,
-                value=data
+                self._producer_topic,
+                data
             )
 
     def send_total_successful_messages(
             self,
             target_topic: str,
             total_messages: int,
+            expected_consumer: int,
             send: Callable[[str, bytes], Any]
         ):
         if target_topic is not None:
-            data = self._success_timestamp_data_format(target_topic, total_messages)
+            data = self._success_timestamp_data_format(target_topic, total_messages, expected_consumer)
             return send(
                 self._producer_topic,
                 data
             )
 
-    def _input_output_pair_data_format(self, source_topic, target_topic: str, deploy_configs: TopicDeploymentConfig):
+    def _input_output_pair_data_format(self, source_topic, target_topic: str, deploy_configs: Optional[TopicDeploymentConfig]):
         return InputOutputThroughputPair(
             source_topic=source_topic,
             target_topic=target_topic,
             deploy_configs=deploy_configs
         ).model_dump_json().encode()
         
-    def _success_timestamp_data_format(self, target_topic: str, total_messages: int):
+    def _success_timestamp_data_format(self, target_topic: str, total_messages: int, expected_consumer : int):
         return MachineConditionData(
             target_topic=target_topic,
             total_messages=total_messages,
-            timestamp=int(get_timestamp().timestamp())
+            timestamp=int(get_timestamp().timestamp()),
+            expected_consumer=expected_consumer
         ).model_dump_json().encode()
 
 class DeployScripts:

@@ -98,12 +98,12 @@ async def main():
             "wait_time": 10
         },
         "master" : {
-            "next_config": ["crawler", "analyzer", "discord_bot", "client"],
+            "next_config": ["crawler", "analyzer"],
             "wait_time": 5
         },
     }
 
-    current_config = ["discord_bot"]
+    current_config = ["kafka"]
 
     while len(current_config) != 0:
 

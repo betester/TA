@@ -3,7 +3,7 @@ import asyncio
 from asyncio.locks import Lock
 from collections.abc import Callable, Coroutine
 from datetime import datetime
-from typing import Any
+from typing import Any, Optional
 
 from pydantic import BaseModel, ConfigDict
 
@@ -17,6 +17,7 @@ class MachineConditionData(BaseModel):
     target_topic: str
     timestamp: int
     total_messages: int
+    expected_consumer: int
 
 class TopicDeploymentConfig(BaseModel):
     max_instance: int
@@ -33,7 +34,7 @@ class TopicDeploymentConfig(BaseModel):
 class InputOutputThroughputPair(BaseModel):
     source_topic: str
     target_topic: str
-    deploy_configs: TopicDeploymentConfig 
+    deploy_configs: Optional[TopicDeploymentConfig]
 
 class TopicDeployDelay(BaseModel):
     model_config = ConfigDict(ignored_types=(asyncio.Lock, ))

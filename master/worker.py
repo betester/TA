@@ -8,6 +8,8 @@ from uuid import uuid4
 from aiokafka.client import asyncio
 
 from aiokafka.conn import functools
+from confluent_kafka.admin import AdminClient
+from confluent_kafka import TopicCollection
 from fogverse.fogverse_logging import FogVerseLogging, get_logger
 from master.contract import DeployArgs, InputOutputThroughputPair, MachineConditionData, MasterObserver, TopicStatistic
 
@@ -89,6 +91,73 @@ class StatisticWorker(MasterObserver, TopicStatistic):
     
     async def stop(self):
         self._stop = True
+
+class DynamicPartitionProfillingWorker(MasterObserver): 
+
+    def __init__(self, profilling_time_window, admin_client: AdminClient, topic: str):
+
+        self.current_consumer = 0
+        self.expected_consumer = 0
+        self.current_parititon = 1
+        self.profilling_time_window = profilling_time_window 
+        self._stop = False
+        self.admin_client = admin_client
+        self.topic = topic
+
+        self.__headers = [
+            "current_consumer",
+            "expected_consumer",
+            "current_partition"
+        ]
+
+        self._fogverse_logger = FogVerseLogging(
+            name=f"{self.__class__.__name__}-{uuid4()}",
+            csv_header=self.__headers,
+            level= logging.INFO + 2
+        )
+
+    def _csv_message(self, data : dict[str, Any]):
+        message = []
+        
+        for header in self.__headers:
+            message.append(data.get(header, ""))
+    
+        return message
+
+    def on_receive(self, data: InputOutputThroughputPair | MachineConditionData):
+        if isinstance(data, InputOutputThroughputPair):
+            self.current_consumer += 1
+        else:
+            self.expected_consumer = data.expected_consumer
+
+    async def start(self):
+        self._fogverse_logger.std_log(f"Starting {self.__class__.__name__}")
+
+        while not self._stop:
+            try:
+                await asyncio.sleep(self.profilling_time_window)            
+                topic_future_description = self.admin_client.describe_topics(TopicCollection([self.topic]))[self.topic]
+                topic_description = topic_future_description.result()
+                self.current_partition = len(topic_description.partitions)
+
+
+                log = self._csv_message({
+                    "current_consumer" : self.current_consumer,
+                    "expected_consumer" : self.expected_consumer,
+                    "current_partition" : self.current_parititon
+                })
+
+                self._fogverse_logger.std_log(log)
+                self._fogverse_logger.csv_log(log)
+
+
+            except Exception:
+                self._fogverse_logger.std_log(print_exc())
+
+    
+    async def stop(self):
+        self._stop = True
+
 
 class ProfillingWorker(MasterObserver):
 
