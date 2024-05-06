@@ -92,7 +92,8 @@ class AnalyzerComponent:
     def parallel_disaster_analyzer(self, consumer_auto_scaler: ConsumerAutoScaler, producer_observer: ProducerObserver):
 
         disaster_analyzers = DisasterAnalyzerImpl(
-            self._disaster_classifier_model_source
+            self._disaster_classifier_model_source,
+            self._keyword_classifier_model_source
         )
 
         analyzer_processor = AnalyzerProcessor(disaster_analyzers)

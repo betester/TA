@@ -13,12 +13,15 @@ class CrawlerProducer(Producer, Profiling):
                  producer_servers: list[str] | str, 
                  consumer_group_id: str,
                  crawler: Crawler,
-                 observer: ProducerObserver):
+                 observer: ProducerObserver,
+                 crawler_delay : float
+                 ):
         # kafka args
         self.producer_topic = producer_topic 
         self.producer_servers = producer_servers
         self._crawler = crawler
         self.group_id = consumer_group_id
+        self.crawler_delay = crawler_delay
         
         Producer.__init__(self)
         Profiling.__init__(self, name='crawler-logs', dirname='crawler-logs')
@@ -35,7 +38,7 @@ class CrawlerProducer(Producer, Profiling):
             # data: Optional[CrawlerResponse] = await self._crawler.crawl()
             # if data: 
             #     return data
-            await asyncio.sleep(0.1)
+            await asyncio.sleep(self.crawler_delay)
             return CrawlerResponse(
                 message="H" * 255,
                 source="Me"
