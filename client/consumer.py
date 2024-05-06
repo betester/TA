@@ -6,12 +6,13 @@ from client.notif_client import NotificationClient
 import os
 
 class NotificationConsumer(Consumer):
-    def __init__(self, notification_client: NotificationClient):
+    def __init__(self, producer_observer, notification_client: NotificationClient):
         self.consumer_topic = str(get_config("NOTIF_CONSUMER_TOPIC", self, "client_v6"))
         self.consumer_servers = str(get_config("NOTIF_CONSUMER_SERVERS", self, "localhost:9092"))
         self.group_id = str(get_config("NOTIF_CONSUMER_GROUP_ID", self, "consumer"))
         self._closed = False
         self.__client = notification_client
+        self._observer = producer_observer
         self.__log = get_logger(name=self.__class__.__name__)
         Consumer.__init__(self)
         self.__log.info(f"NotificationConsumer initialized with topic: {self.consumer_topic}")
@@ -30,6 +31,11 @@ class NotificationConsumer(Consumer):
         if int(data.is_disaster):
             try:
                 self.__client.send_notification(data.text)
+                await self._observer.send_total_successful_messages(
+                    target_topic=self.producer_topic,
+                    send = lambda x, y: self.producer.send(topic=x, value=y),
+                    total_messages = 1
+                )
 
             except Exception as e:
                 self.__log.error(f"Error sending notification: {e}")
