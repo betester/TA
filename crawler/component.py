@@ -15,6 +15,7 @@ class CrawlerComponent:
         self._producer_servers =  str(get_config("CRAWLER_ANALYZER_SERVERS", self, "localhost:9092"))
         self._producer_topic =  str(get_config("CRAWLER_PRODUCER_TOPIC", self, "xi"))
         self._consumer_group_id = str(get_config("CRAWLER_CONSUMER_GROUP_ID", self, "crawler"))
+        self._metadata_max_age_ms = int(str(get_config("METADATA_MAX_AGE_MS", self, 5000)))
         self._crawler_delay = float(str(get_config("CRAWLER_DELAY", self, 0.1)))
 
     def __kaggle_parser(self, row: list[str]) -> CrawlerResponse:
@@ -41,5 +42,6 @@ class CrawlerComponent:
             producer_servers=self._producer_servers,
             crawler=crawler,
             observer=observer,
+            metadata_max_age_ms=self._metadata_max_age_ms,
             crawler_delay=self._crawler_delay
         )

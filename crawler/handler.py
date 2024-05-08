@@ -14,6 +14,7 @@ class CrawlerProducer(Producer, Profiling):
                  consumer_group_id: str,
                  crawler: Crawler,
                  observer: ProducerObserver,
+                 metadata_max_age_ms: int,
                  crawler_delay : float
                  ):
         # kafka args
@@ -22,6 +23,10 @@ class CrawlerProducer(Producer, Profiling):
         self._crawler = crawler
         self.group_id = consumer_group_id
         self.crawler_delay = crawler_delay
+
+        self.producer_conf = {
+            'metadata_max_age_ms' : metadata_max_age_ms
+        } 
         
         Producer.__init__(self)
         Profiling.__init__(self, name='crawler-logs', dirname='crawler-logs')
