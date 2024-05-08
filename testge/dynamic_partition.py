@@ -1,29 +1,41 @@
 
+import time
+
 from traceback import print_exc
 
-from asyncio import Task, create_task, gather, sleep, Future
-from aiokafka.conn import asyncio
-from confluent_kafka.admin import AdminClient
-from fogverse import Consumer, Producer
+from functools import partial
+from confluent_kafka import Message
+from asyncio import create_task, gather, sleep
+from confluent_kafka.admin import AdminClient, NewTopic
+from transformers.utils.hub import uuid4
+from fogverse import Producer
+from fogverse.base import Processor
+from fogverse.consumer_producer import ConfluentConsumer, ConfluentProducer
+from fogverse.general import ParallelRunnable
 from master.component import MasterComponent
-from uuid import uuid4
+from master.contract import TopicDeploymentConfig
+from master.master import DeployScripts
+from fogverse.fogverse_logging import get_logger
+
+deploy_scripts = DeployScripts() 
 
 total_consumers = 10
-time_interval = 20
+time_interval = 5
 send_rate = 0.1 
+consume_rate = 0.5
 initial_partition = 1
 current_consumers = 0 
 
 from confluent_kafka.admin import (
-    AdminClient,
-    NewTopic
+    AdminClient
 )
 
-topic = "testge"
-group_id = "testge"
+topic = "h"
+group_id = "he"
 kafka_server = "localhost:9092"
-master_component = MasterComponent()
+consumer_topic = "cleint"
 
+master_component = MasterComponent()
 
 kafka_admin = AdminClient(
     conf={
@@ -31,16 +43,17 @@ kafka_admin = AdminClient(
     },
 )
 
-master = master_component.dynamic_partition_master_observer(topic, kafka_admin, 1, group_id)
+master = master_component.dynamic_partition_master_observer(consumer_topic, topic, kafka_admin, 1, "not related")
 producer_observer = master_component.producer_observer()
-consumer_auto_scaler = master_component.consumer_auto_scaler(kafka_admin)
 
 class MockSender(Producer):
 
     def __init__(self):
         self.producer_servers = kafka_server
         self.producer_topic = topic
-        self.group_id = group_id
+        self.producer_conf = {
+                "metadata_max_age_ms": 5 * 1000 # 5 seconds to refresh the metadata
+        }
         self._closed = False
 
         Producer.__init__(self)
@@ -52,72 +65,119 @@ class MockSender(Producer):
     async def send(self, data, topic=None, key=None, headers=None, callback=None):
         result = await super().send(data, topic, key, headers, callback)
         await producer_observer.send_total_successful_messages_async(
-            target_topic="",
-            total_messages=0,
+            target_topic=self.producer_topic,
+            total_messages=1,
             expected_consumer=current_consumers,
             send=self.producer.send
         )
 
         return result
 
-
-class MockConsumer(Consumer, Producer):
-    
-    def __init__(self):
-        self.consumer_topic = topic
-        self.consumer_servers = kafka_server 
-        self.producer_servers = kafka_server
-        self.group_id = group_id 
-        self.producer_topic = ""
-        self._closed = False
-
-        Producer.__init__(self)
-        Consumer.__init__(self)
-
-    async def _send(self, data, *args, **kwargs) -> asyncio.Future:
-        return 
-
-    async def _start(self):
-
-        await consumer_auto_scaler.async_start(
-            consumer=self.consumer,
-            producer=self.producer,
-            consumer_group=self.group_id,
-            consumer_topic=self.consumer_topic,
-            consumer_id=str(uuid4())
-        )
-
-        await producer_observer.send_input_output_ratio_pair(
-            source_topic=self.consumer_topic,
-            target_topic="",
-            topic_configs=None,
-            send = lambda x, y: self.producer.send(topic=x, value=y)
-        )
-
 mock_producer = MockSender()
+
+class MockProcessor(Processor):
+
+    def process(self, messages: list[Message]) -> list[bytes]:
+        processed_msg : list[bytes] = [] 
+
+        time.sleep(consume_rate)
+
+        for message in messages:
+            msg_val = message.value()
+            processed_msg.append(msg_val)
+
+        return processed_msg
+
+mock_processor = MockProcessor()
+
+start_producer_callback =partial(
+    producer_observer.send_input_output_ratio_pair,
+    topic,
+    "",
+    None
+)
+
+def run_mock_consumer():
+
+        kafka_admin = AdminClient(
+            conf={
+                "bootstrap.servers": "localhost"
+            },
+        )
+
+        consumer_auto_scaler = master_component.consumer_auto_scaler(kafka_admin)
+
+        mock_consumer = ConfluentConsumer(
+            topic,
+            kafka_server,
+            group_id,
+            str(uuid4()),
+            consumer_auto_scaler,
+            consumer_extra_config={
+                "auto.offset.reset": "latest",
+                "metadata.max.age.ms": 60_000 # one minute to refresh the metadata
+            }
+        )
+
+        mock_producer_con = ConfluentProducer(
+            consumer_topic, 
+            kafka_server,
+            mock_processor,
+            start_producer_callback,
+            producer_observer.send_total_successful_messages
+        )
+
+        parallel_runnable = ParallelRunnable(
+            mock_consumer,
+            mock_producer_con,
+            None
+        )
+
+        parallel_runnable.run()
 
 async def run_test():
 
     global current_consumers
+    running_consumers = []
+    deleted_topic = [topic, 'observer']
+
 
     try:
-        print(f"Deleting topic {topic}")
-        delete_topic_dictionary = kafka_admin.delete_topics([topic, 'observer'])
+        print(f"Deleting topic {deleted_topic}")
+        delete_topic_dictionary = kafka_admin.delete_topics(deleted_topic)
         delete_topic_dictionary[topic].result()
+        create_topic_future = kafka_admin.create_topics([NewTopic(topic, num_partitions=initial_partition)])[topic]
         delete_topic_dictionary['observer'].result()
+        create_topic_future.result()
 
     except Exception:
         print_exc()
 
-    running_consumers : list[Task] = []
-
-    running_master = create_task(master.run())
     await sleep(2)
-    producer = create_task(mock_producer.run())
 
-    while current_consumers < total_consumers:
-        await sleep(time_interval)
-        running_consumers.append(create_task(MockConsumer().run()))
-        current_consumers += 1
+    try:
+        running_master = create_task(master.run())
+        producer = create_task(mock_producer.run())
 
-    await gather(running_master, producer, *running_consumers)
+        while current_consumers <= total_consumers:
+            deploy = deploy_scripts.get_deploy_functions("LOCAL")
+            logger = get_logger(name=f"testge-{current_consumers}")
+
+            result = await deploy(
+                TopicDeploymentConfig(
+                    service_name="testge --type=dp --extra=consume"
+                ),
+                logger
+            )
+
+            running_consumers.append(result.shut_down_machine)
+            print(f"iteration {current_consumers}")
+            current_consumers += 1
+            await sleep(time_interval)
+
+        await gather(running_master, producer)
+
+    except KeyboardInterrupt as e:
+        for shutdown in running_consumers:
+            shutdown()
+

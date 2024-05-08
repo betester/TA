@@ -3,7 +3,8 @@ from collections.abc import Callable
 from threading import Event
 import socket
 import sys
-from typing import Any, Optional
+from traceback import print_exc
+from typing import Any
 import uuid
 import queue
 
@@ -115,41 +116,49 @@ class ConfluentConsumer:
                  topics: str,
                  kafka_server: str,
                  group_id: str,
+                 consumer_id : str,
                  consumer_auto_scaler,
                  consumer_extra_config: dict={},
                  poll_time=1.0,
-                 batch_size: int = 1
+                 batch_size: int = 1,
                  ):
 
+        self.topics = topics
+        self.group_id = group_id
         self.poll_time = poll_time
         self.batch_size = batch_size
+        self.consumer_auto_scaler = consumer_auto_scaler
+        self.consumer_id = consumer_id
 
         self.consumer = Consumer({
             **consumer_extra_config,
             "bootstrap.servers": kafka_server,
-            "group.id": group_id,
-            "client.id": socket.gethostname()
+            "group.id": group_id
         })
 
-        if consumer_auto_scaler is not None:
-            self.consumed_messages = consumer_auto_scaler.start(
-                self.consumer,
-                topics,
-                group_id
-            )
-        else:
-            self.consumer.subscribe([topics])
+
 
         self.log = get_logger(name=self.__class__.__name__)
 
     def _populate_queue_with_consumed_message(self, queue: queue.Queue):
         if not self.consumed_messages:
-            return
+            return queue.put(None)
 
         for consumed_message in self.consumed_messages:
             queue.put(consumed_message)
 
     def start_consume(self, queue: queue.Queue, stop_event: Event):
+
+        if self.consumer_auto_scaler is not None:
+            self.consumed_messages = self.consumer_auto_scaler.start(
+                self.consumer,
+                self.topics,
+                self.group_id,
+                self.consumer_id
+            )
+
+        else:
+            self.consumer.subscribe([self.topics])
 
         self._populate_queue_with_consumed_message(queue)
 
@@ -158,6 +167,7 @@ class ConfluentConsumer:
                 messages: list[Message] = self.consumer.consume(self.batch_size, self.poll_time)
                 for message in messages:
                     queue.put(message)
+
         except Exception as e:
             self.log.error(e)
 
@@ -169,7 +179,7 @@ class ConfluentProducer:
                  kafka_server: str,
                  processor: Processor,
                  start_producer_callback : Callable[[Callable[[str, bytes], Any]], Any],
-                 on_complete: Callable[[str, int, Callable[[str, bytes], Any]], None],
+                 on_complete: Callable[[str, int, int, Callable[[str, bytes], Any]], None],
                  producer_extra_config: dict={},
                  batch_size: int = 1):
         
@@ -192,14 +202,14 @@ class ConfluentProducer:
     
     def start_produce(self, queue: queue.Queue, stop_event: Event):
 
-        if self.start_producer_callback and not self._callback_is_called:
-            self._callback_is_called = True
-            self.start_producer_callback(lambda x, y: self.producer.produce(topic=x, value=y))
-
         try:
             message_batch: list[Message] = []
             while not stop_event.is_set():
                 message: Message = queue.get()
+
+                if self.start_producer_callback and not self._callback_is_called:
+                    self._callback_is_called = True
+                    self.start_producer_callback(lambda x, y: self.producer.produce(topic=x, value=y))
                 
                 if message is None:
                     continue
@@ -220,9 +230,11 @@ class ConfluentProducer:
                         self.producer.flush()
                     queue.task_done()
                     message_batch.clear()
+
                     self.producer_on_complete(
                         self.topic,
                         total_messages,
+                        0,
                         lambda x, y: self.producer.produce(
                             topic=x,
                             value=y
@@ -230,7 +242,7 @@ class ConfluentProducer:
                     )
 
         except Exception as e: 
-            self.log.error(e)
+            print_exc()
 
 
 def _get_cv_video_capture(device=0):

@@ -94,7 +94,7 @@ class StatisticWorker(MasterObserver, TopicStatistic):
 
 class DynamicPartitionProfillingWorker(MasterObserver): 
 
-    def __init__(self, profilling_time_window, admin_client: AdminClient, topic: str):
+    def __init__(self, profilling_time_window, admin_client: AdminClient, topic: str, consumer_topic : str):
 
         self.current_consumer = 0
         self.expected_consumer = 0
@@ -103,11 +103,17 @@ class DynamicPartitionProfillingWorker(MasterObserver):
         self._stop = False
         self.admin_client = admin_client
         self.topic = topic
+        self.consumer_topic = consumer_topic
+
+        self.producer_throughput = 0
+        self.consumer_throughput = 0
 
         self.__headers = [
             "current_consumer",
             "expected_consumer",
-            "current_partition"
+            "current_partition",
+            "producer_throughput",
+            "consumer_throughput"
         ]
 
         self._fogverse_logger = FogVerseLogging(
@@ -128,7 +134,14 @@ class DynamicPartitionProfillingWorker(MasterObserver):
         if isinstance(data, InputOutputThroughputPair):
             self.current_consumer += 1
         else:
-            self.expected_consumer = data.expected_consumer
+            if data.target_topic == self.topic:
+                # this basically the main producer
+                self.producer_throughput += data.total_messages
+                self.expected_consumer = data.expected_consumer
+            elif data.target_topic == self.consumer_topic:
+                # after received messages from the main producer
+                self.consumer_throughput += data.total_messages
+            
 
     async def start(self):
         self._fogverse_logger.std_log(f"Starting {self.__class__.__name__}")
@@ -139,18 +152,22 @@ class DynamicPartitionProfillingWorker(MasterObserver):
                 topic_future_description = self.admin_client.describe_topics(TopicCollection([self.topic]))[self.topic]
                 topic_description = topic_future_description.result()
                 self.current_partition = len(topic_description.partitions)
-                print(len(topic_description.partitions))
 
                 msg = {
                     "current_consumer" : self.current_consumer,
                     "expected_consumer" : self.expected_consumer,
-                    "current_partition" : self.current_partition
+                    "current_partition" : self.current_partition,
+                    "producer_throughput" : self.producer_throughput,
+                    "consumer_throughput" : self.consumer_throughput,
                 }
 
                 log = self._csv_message(msg)
 
                 self._fogverse_logger.std_log(msg)
                 self._fogverse_logger.csv_log(log)
+
+                self.consumer_throughput = 0
+                self.producer_throughput = 0
 
 
             except Exception:

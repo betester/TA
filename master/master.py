@@ -6,6 +6,7 @@ import time
 
 from logging import Logger
 from collections.abc import Callable, Coroutine
+from traceback import print_exc
 from typing import Any, Optional
 from aiokafka.client import asyncio
 from confluent_kafka.admin import (
@@ -116,6 +117,7 @@ class ConsumerAutoScaler:
               consumer: Consumer,
               topic_id: str,
               group_id: str,
+              consumer_id : int,
               /,
               retry_attempt: int=3) -> Optional[list[Message]]:
 
@@ -168,12 +170,13 @@ class ConsumerAutoScaler:
                 self.consumer_is_assigned_partition = len(consumer_partition_assignment) != 0
 
                 if self.consumer_is_assigned_partition:
+                    consumer.commit()
                     self._logger.info(f"Consumer is assigned to {len(consumer_partition_assignment)} partitions, consuming")
                     return consumed_message
 
-                self._logger.info("Fail connecting, retrying...")
+                self._logger.info(f"Fail connecting for consumer id : {consumer_id}, retrying...")
             except Exception as e:
-                self._logger.info(e)
+                print_exc()
 
     def on_revoke(self, consumer, partitions):
         #TODO: handle if needed in the future
@@ -354,9 +357,7 @@ class DeployScripts:
                 return False
             
         if process.stdout:
-            log_file_name = f'{configs.service_name}-{process.pid}.log'
-            self._logger.info(f"Writing service {configs.service_name} logs with filename: {log_file_name}")
-            asyncio.create_task(self.write_deployed_service_logs(log_file_name, process.stdout)) 
+            asyncio.create_task(self._write_deploy_logs(process.stdout)) 
             self._logger.info(f"Command executed successfully, service {configs.service_name} is deployed")
             return DeployResult(
                 machine_id=str(process.pid),

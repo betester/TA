@@ -125,7 +125,7 @@ class MasterComponent:
             observers=workers
         )
     
-    def dynamic_partition_master_observer(self, topic: str, admin_client : AdminClient, profilling_time_window: int, group_id : str):
+    def dynamic_partition_master_observer(self, hell_na_consumer_topic : str, topic: str, admin_client : AdminClient, profilling_time_window: int, group_id : str):
 
         consumer_topic = str(get_config("OBSERVER_CONSUMER_TOPIC", self, "observer"))
         consumer_servers = str(get_config("OBSERVER_CONSUMER_SERVERS", self, "localhost:9092"))
@@ -134,7 +134,8 @@ class MasterComponent:
         dynamic_partition_worker = DynamicPartitionProfillingWorker(
             profilling_time_window,
             admin_client,
-            topic
+            topic,
+            hell_na_consumer_topic
         )
         workers : list[MasterObserver] = [dynamic_partition_worker]
 

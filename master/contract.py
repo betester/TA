@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 import asyncio
 from asyncio.locks import Lock
 from collections.abc import Callable, Coroutine
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Optional
 
@@ -20,16 +21,16 @@ class MachineConditionData(BaseModel):
     expected_consumer: int
 
 class TopicDeploymentConfig(BaseModel):
-    max_instance: int
-    topic_id: str
-    project_name: str
-    service_name: str
-    image_name: str
-    zone: str
-    service_account: str
-    image_env: dict 
-    machine_type: str
-    provider: str
+    max_instance: Optional[int] = None
+    topic_id: Optional[str] = None
+    project_name: Optional[str] = None
+    service_name: Optional[str] = None
+    image_name: Optional[str] = None
+    zone: Optional[str] = None
+    service_account: Optional[str] = None
+    image_env: Optional[dict]  = None
+    machine_type: Optional[str] = None
+    provider: Optional[str] = None
 
 class InputOutputThroughputPair(BaseModel):
     source_topic: str
