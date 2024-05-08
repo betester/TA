@@ -123,6 +123,9 @@ class ConfluentConsumer:
 
         self.poll_time = poll_time
         self.batch_size = batch_size
+        self.topics = topics
+        self.group_id = group_id
+        self.consumer_auto_scaler = consumer_auto_scaler
 
         self.consumer = Consumer({
             **consumer_extra_config,
@@ -131,25 +134,28 @@ class ConfluentConsumer:
             "client.id": socket.gethostname()
         })
 
-        if consumer_auto_scaler is not None:
-            self.consumed_messages = consumer_auto_scaler.start(
-                self.consumer,
-                topics,
-                group_id
-            )
-        else:
-            self.consumer.subscribe([topics])
-
         self.log = get_logger(name=self.__class__.__name__)
 
     def _populate_queue_with_consumed_message(self, queue: queue.Queue):
         if not self.consumed_messages:
-            return
-
+            return queue.put(None)
+            
         for consumed_message in self.consumed_messages:
             queue.put(consumed_message)
 
     def start_consume(self, queue: queue.Queue, stop_event: Event):
+
+
+        if self.consumer_auto_scaler is not None:
+            self.consumed_messages = self.consumer_auto_scaler.start(
+                self.consumer,
+                self.topics,
+                self.group_id
+            )
+
+        else:
+            self.consumer.subscribe([self.topics])
+
 
         self._populate_queue_with_consumed_message(queue)
 
@@ -192,14 +198,15 @@ class ConfluentProducer:
     
     def start_produce(self, queue: queue.Queue, stop_event: Event):
 
-        if self.start_producer_callback and not self._callback_is_called:
-            self._callback_is_called = True
-            self.start_producer_callback(lambda x, y: self.producer.produce(topic=x, value=y))
-
         try:
             message_batch: list[Message] = []
             while not stop_event.is_set():
+
                 message: Message = queue.get()
+                
+                if self.start_producer_callback and not self._callback_is_called:
+                    self._callback_is_called = True
+                    self.start_producer_callback(lambda x, y: self.producer.produce(topic=x, value=y))
                 
                 if message is None:
                     continue
