@@ -5,6 +5,7 @@ from master.master import ProducerObserver
 from .crawler import Crawler, CrawlerResponse
 from fogverse import Producer, Profiling
 from fogverse.fogverse_logging import get_logger
+import time
 
 class CrawlerProducer(Producer, Profiling):
 
@@ -45,8 +46,9 @@ class CrawlerProducer(Producer, Profiling):
             #     return data
             await asyncio.sleep(self.crawler_delay)
             return CrawlerResponse(
-                message="H" * 255,
-                source="Me"
+                message="H" * 10,
+                source="Me",
+                timestamp=str(time.time())
             )
 
         except Exception:

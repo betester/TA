@@ -3,7 +3,7 @@ from model.analyzer_contract import DisasterAnalyzer, DisasterAnalyzerResponse
 from model.crawler_contract import CrawlerResponse
 from fogverse.base import Processor
 from fogverse.fogverse_logging import get_logger
-
+import time
 
 class AnalyzerProcessor(Processor):
 
@@ -21,7 +21,9 @@ class AnalyzerProcessor(Processor):
                 DisasterAnalyzerResponse(
                     text=crawler_results[i],
                     is_disaster=disaster_messages[i],
-                    keyword=keyword_messages[i]
+                    keyword=keyword_messages[i],
+                    crawler_timestamp=messages[i].value().timestamp,
+                    analyzer_timestamp=time.time()
                 ).model_dump_json().encode() 
                 for i in range(len(crawler_results)
             )]

@@ -3,6 +3,7 @@ from fogverse import Producer, Profiling
 from model.crawler_contract import CrawlerResponse
 from fogverse.util import get_config
 import socket
+import time
 
 class DiscordProducer(Producer, Profiling):
     def __init__(self, messages, producer_observer):
@@ -22,7 +23,8 @@ class DiscordProducer(Producer, Profiling):
             data = await self.messages.get()
             return CrawlerResponse(
                 message=data,
-                source="discord"
+                source="discord",
+                timestamp=time.time()
             )
         
         except asyncio.QueueEmpty:
