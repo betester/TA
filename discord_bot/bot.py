@@ -3,6 +3,7 @@ from fogverse.fogverse_logging import get_logger
 import asyncio
 import os
 import csv
+import time
 
 class DiscordClient(discord.Client):
     def __init__(self, intents, messages, producer):
@@ -23,7 +24,7 @@ class DiscordClient(discord.Client):
             # send embed message
             embed = discord.Embed(
                 title="Help",
-                description="Commands",
+                descriptiozn="Commands",
                 color=discord.Color.blue()
             )
             embed.add_field(name="$start <delay>", value="Start sending messages with delay (seconds)", inline=False)

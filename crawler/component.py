@@ -1,5 +1,5 @@
-
 import os
+import time
 
 from master.master import ProducerObserver
 
@@ -21,7 +21,8 @@ class CrawlerComponent:
     def __kaggle_parser(self, row: list[str]) -> CrawlerResponse:
         return CrawlerResponse(
             message=row[3],
-            source="kaggle data"
+            source="kaggle data",
+            timestamp=time.time()
         )
 
     def __read_files(self, directory_path: str):

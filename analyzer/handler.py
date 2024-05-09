@@ -1,5 +1,5 @@
-
 import socket
+import time
 
 from analyzer import DisasterAnalyzer
 from fogverse.general import ParallelRunnable
@@ -74,20 +74,23 @@ class AnalyzerProducer(Consumer, Producer):
     async def process(self, data: CrawlerResponse):
         try:
             message_is_disaster = self._classifier_model.analyze("is_disaster", [data.message])[0]
-            
             if message_is_disaster == "0":
                 return DisasterAnalyzerResponse(
                     is_disaster=message_is_disaster,
-                    text=data.message
+                    text=data.message,
+                    crawler_timestamp=data.timestamp,
+                    analyzer_timestamp=time.time()
                 )
 
             keyword_result = self._classifier_model.analyze("keyword", [data.message])
 
             if keyword_result:
                 return DisasterAnalyzerResponse(
-                   keyword=keyword_result[0],
-                   is_disaster=message_is_disaster,
-                   text=data.message
+                    keyword=keyword_result[0],
+                    is_disaster=message_is_disaster,
+                    text=data.message,
+                    crawler_timestamp=data.timestamp,
+                    analyzer_timestamp=time.time()
                 )
 
         except Exception as e:

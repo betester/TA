@@ -3,6 +3,7 @@ from linebot import LineBotApi, WebhookHandler
 from linebot.exceptions import InvalidSignatureError
 from linebot.models import MessageEvent, TextMessage, TextSendMessage
 import os
+import time
 
 from master.component import MasterComponent
 from confluent_kafka import Producer
@@ -46,7 +47,7 @@ def callback():
 def handle_message(event):
     text = event.message.text
 
-    producer.send(topic="analyzer", data=CrawlerResponse(message = text, source="MOKE").model_dump_json().encode())
+    producer.send(topic="analyzer", data=CrawlerResponse(message = text, source="MOKE", timestamp=time.time).model_dump_json().encode())
     producer_observer.send_total_successful_messages(
         "analyzer",
         1,
