@@ -12,7 +12,6 @@ from aiokafka import (
     AIOKafkaProducer as _AIOKafkaProducer
 )
 from confluent_kafka import Consumer, Message, Producer
-from transformers.utils.hub import uuid4
 
 from .util import get_config
 from .fogverse_logging import FogVerseLogging, get_logger
@@ -127,7 +126,7 @@ class ConfluentConsumer:
         self.topics = topics
         self.group_id = group_id
         self.consumer_auto_scaler = consumer_auto_scaler
-        self.consumer_id = str(uuid4())
+        self.consumer_id = str(uuid.uuid4())
 
         self.consumer = Consumer({
             **consumer_extra_config,
