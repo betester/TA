@@ -1,15 +1,16 @@
 
+from asyncio import Server, StreamReader, StreamWriter
 import logging
 from traceback import print_exc
 
 from collections.abc import Callable, Coroutine
-from typing import Any
+from typing import Any, Optional
 from uuid import uuid4
 from aiokafka.client import asyncio
 
 from aiokafka.conn import functools
 from fogverse.fogverse_logging import FogVerseLogging, get_logger
-from master.contract import DeployArgs, InputOutputThroughputPair, MachineConditionData, MasterObserver, TopicStatistic
+from master.contract import DeployArgs, InputOutputThroughputPair, LockRequest, LockResponse, MachineConditionData, MasterObserver, TopicStatistic, UnlockRequest, UnlockResponse
 
 class StatisticWorker(MasterObserver, TopicStatistic):
 
@@ -155,6 +156,82 @@ class ProfillingWorker(MasterObserver):
     async def stop(self):
         self._stop = True
 
+
+class DistributedWorkerServerWorker(MasterObserver):
+
+    MAX_RECEIVE_BYTE = 1024
+
+    def __init__(self, master_host : str, master_port : int):
+        self._logger = get_logger(name=self.__class__.__name__)
+        self.master_host = master_host
+        self.master_port = master_port
+        self.request_lock = asyncio.Lock()
+        self.current_consumer_id : Optional[str] = None
+        self._stop = False
+
+        self.server : Optional[Server] = None
+
+    def parse_request(self, request: bytes):
+        try:
+            return LockRequest.model_validate_json(request, strict=True)
+        except Exception:
+            return UnlockRequest.model_validate_json(request, strict=True)
+        
+
+    async def handle_request(self, reader : StreamReader, writer : StreamWriter):
+        while not self._stop:
+            try:
+                await self.request_lock.acquire()
+                request = (await reader.read(DistributedWorkerServerWorker.MAX_RECEIVE_BYTE))
+
+                if len(request) == 0: 
+                    return
+
+                parsed_request = self.parse_request(request)
+                self._logger.info(parsed_request)
+
+                if isinstance(parsed_request, LockRequest):
+                    # not allowed to request lock when there is already another consumer locking
+                    if self.current_consumer_id:
+                        lock_response = LockResponse(can_lock=False)
+                        writer.write(lock_response.model_dump_json().encode())
+                        await writer.drain()
+                    else:
+                        self.current_consumer_id = parsed_request.lock_consumer_id
+                        lock_response = LockResponse(can_lock=True)
+                        writer.write(lock_response.model_dump_json().encode())
+                        await writer.drain()
+                else:
+                    if parsed_request.unlock_consumer_id == self.current_consumer_id:
+                        self.current_consumer_id = None
+                        unlock_response = UnlockResponse(is_unlocked=True)
+                        writer.write(unlock_response.model_dump_json().encode())
+                        await writer.drain()
+                    else:
+                        unlock_response = UnlockResponse(is_unlocked=False)
+                        writer.write(unlock_response.model_dump_json().encode())
+                        await writer.drain()
+
+            except Exception as e:
+                self._logger.error(e)
+            finally:
+                self.request_lock.release()
+
+
+    def on_receive(self, data: InputOutputThroughputPair | MachineConditionData):
+        pass
+    
+    async def start(self):
+        self._logger.info("Starting distributed lock worker")
+        self.server = await asyncio.start_server(self.handle_request, self.master_host, self.master_port)
+
+        async with self.server:
+            await self.server.serve_forever()
+
+    async def stop(self):
+        if self.server:
+            self.server.close()
+        
 class InputOutputRatioWorker(MasterObserver):
 
     def __init__(

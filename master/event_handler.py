@@ -2,8 +2,6 @@ from aiokafka.client import asyncio
 from fogverse import Consumer
 from fogverse.fogverse_logging import get_logger
 from master.contract import InputOutputThroughputPair, MachineConditionData, MasterObserver
-
-
 class Master(Consumer):
 
     def __init__(self, 

@@ -3,13 +3,13 @@ from os import chmod
 from uuid import uuid4
 from logging import Logger
 from fogverse.util import get_config
-from master.contract import DeployResult, TopicDeploymentConfig
+from master.contract import DeployResult, MasterObserver, TopicDeploymentConfig
 from master.event_handler import Master
 from master.master import AutoDeployer, ConsumerAutoScaler, DeployScripts, ProducerObserver, TopicSpikeChecker
 from confluent_kafka.admin import AdminClient
 from functools import partial
 
-from master.worker import InputOutputRatioWorker, ProfillingWorker, StatisticWorker
+from master.worker import DistributedWorkerServerWorker, InputOutputRatioWorker, ProfillingWorker, StatisticWorker
 from scripts.local_deploy import deploy_instance_with_process
 class MasterComponent:
 
@@ -17,6 +17,8 @@ class MasterComponent:
         
         bootstrap_host = str(get_config("KAFKA_ADMIN_HOST", self, "localhost"))
         sleep_time = int(str(get_config("SLEEP_TIME", self, 3)))
+        master_host = str(get_config("MASTER_HOST", self, "localhost"))
+        master_port = int(str(get_config("MASTER_PORT", self, 4242)))
 
         kafka_admin=AdminClient(
             conf={
@@ -26,7 +28,9 @@ class MasterComponent:
 
         return ConsumerAutoScaler(
             kafka_admin=kafka_admin,
-            sleep_time=sleep_time
+            sleep_time=sleep_time,
+            master_host=master_host,
+            master_port=master_port
         )
     
     def producer_observer(self):
@@ -99,6 +103,8 @@ class MasterComponent:
         input_output_refresh_rate = float(str(get_config("INPUT_OUTPUT_REFRESH_RATE", self, 60)))
         profilling_time_window = int(str(get_config("PROFILLING_TIME_WINDOW", self, 1)))
         hearbeart_deploy_delay = int(str(get_config("HEARBEART_DEPLOY_DELAY", self, 120))) # 2 minutes after deployment happens
+        master_host = str(get_config("MASTER_HOST", self, "localhost"))
+        master_port = int(str(get_config("MASTER_PORT", self, 4242)))
 
         statistic_worker = StatisticWorker(maximum_seconds=window_max_second)
         topic_spike_checker = TopicSpikeChecker(statistic_worker)
@@ -121,8 +127,12 @@ class MasterComponent:
             below_threshold_callback=auto_deployer.deploy
         )
         profilling_worker = ProfillingWorker(auto_deployer.get_topic_total_machine, profilling_time_window)
+        distributed_lock_worker = DistributedWorkerServerWorker(master_host=master_host, master_port=master_port)
 
-        workers = [statistic_worker, profilling_worker, input_output_worker, auto_deployer]
+        workers : list[MasterObserver] = [
+            profilling_worker,
+            distributed_lock_worker
+        ]
 
         return Master(
             consumer_topic=consumer_topic,
