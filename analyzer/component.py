@@ -14,7 +14,7 @@ class AnalyzerComponent:
     def __init__(self):
         self._producer_topic = str(get_config("ANALYZER_PRODUCER_TOPIC", self, "client_v7"))
         self._producer_servers = str(get_config("ANALYZER_PRODUCER_SERVERS", self, "localhost:9092"))
-        self._consumer_topic = str(get_config("ANALYZER_CONSUMER_TOPIC", self, "xi"))
+        self._consumer_topic = str(get_config("ANALYZER_CONSUMER_TOPIC", self, "xi2"))
         self._consumer_servers = str(get_config("ANALYZER_CONSUMER_SERVERS", self, "localhost:9092"))
         self._consumer_group_id = str(get_config("ANALYZER_CONSUMER_GROUP_ID", self, "analyzer_v2"))
         # assigns based on the attribute and model source
@@ -141,7 +141,6 @@ class AnalyzerComponent:
             consumer,
             producer,
             None,
-            total_producer=5
         )
 
         return ParallelAnalyzerJobService(runnable)

@@ -3,7 +3,7 @@ from os import chmod
 from uuid import uuid4
 from logging import Logger
 from fogverse.util import get_config
-from master.contract import DeployResult, TopicDeploymentConfig
+from master.contract import DeployResult, MasterObserver, TopicDeploymentConfig
 from master.event_handler import Master
 from master.master import AutoDeployer, ConsumerAutoScaler, DeployScripts, ProducerObserver, TopicSpikeChecker
 from confluent_kafka.admin import AdminClient
@@ -129,11 +129,8 @@ class MasterComponent:
         profilling_worker = ProfillingWorker(auto_deployer.get_topic_total_machine, profilling_time_window)
         distributed_lock_worker = DistributedWorkerServerWorker(master_host=master_host, master_port=master_port)
 
-        workers = [
-            statistic_worker,
+        workers : list[MasterObserver] = [
             profilling_worker,
-            input_output_worker,
-            auto_deployer,
             distributed_lock_worker
         ]
 

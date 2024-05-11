@@ -63,17 +63,7 @@ class LockResponse(BaseModel):
 class UnlockResponse(BaseModel):
     is_unlocked: bool
 
-class MasterWorker(ABC):
-
-    @abstractmethod
-    async def start(self):
-        pass
-
-    @abstractmethod
-    async def stop(self):
-        pass
-
-class MasterObserver(MasterWorker):
+class MasterObserver(ABC):
 
     @abstractmethod
     def on_receive(self, data: InputOutputThroughputPair | MachineConditionData):

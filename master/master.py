@@ -8,7 +8,7 @@ import socket
 
 from logging import Logger
 from collections.abc import Callable, Coroutine
-from typing import Any, Optional
+from typing import Any, Optional, final
 from aiokafka.client import asyncio
 from confluent_kafka.admin import (
     AdminClient,
@@ -143,7 +143,7 @@ class ConsumerAutoScaler:
 
             self._logger.info(f"Subscribing to topic {topic_id}")
 
-            client.bind((self.master_host, self.master_port))
+            client.connect((self.master_host, self.master_port))
 
             # acquiring lock from master
             request = LockRequest(lock_consumer_id=consumer_id)
@@ -154,7 +154,7 @@ class ConsumerAutoScaler:
             while not can_lock:
                 try:
                     self._logger.info(f"{consumer_id} is sending lock request to master")
-                    client.send(request_byte)
+                    client.sendall(request_byte)
                     data = client.recv(ConsumerAutoScaler.MAX_BYTE)
                     lock_response = LockResponse.model_validate_json(data)
                     can_lock = lock_response.can_lock
@@ -204,7 +204,15 @@ class ConsumerAutoScaler:
 
             self._logger.info("Waiting for consumer to be assigned on a partition")
 
+            consumed_message = []
+
             while True:
+
+                message = consumer.poll(self._sleep_time)
+
+                if message:
+                    consumed_message.append(message)
+
                 consumer_partition_assignment = consumer.assignment()
                 self.consumer_is_assigned_partition = len(consumer_partition_assignment) != 0
 
@@ -234,9 +242,13 @@ class ConsumerAutoScaler:
                     self._logger.error(e)
 
             client.close()
+            return consumed_message
 
         except Exception as e:
             self._logger.error(e)
+
+        finally:
+            client.close()
 
 
     def start(self,
