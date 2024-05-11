@@ -34,7 +34,8 @@ from master.contract import (
     TopicDeployDelay, 
     TopicDeploymentConfig, 
     TopicStatistic,
-    UnlockRequest
+    UnlockRequest,
+    UnlockResponse
 )
 
 
@@ -141,15 +142,18 @@ class ConsumerAutoScaler:
             can_lock = False
 
             while not can_lock:
-                self._logger.info(f"{consumer_id} is sending lock request to master")
-                client.send(request_byte)
-                data = client.recv(ConsumerAutoScaler.MAX_BYTE)
-                lock_response = LockResponse.model_validate_json(data)
-                can_lock = lock_response.can_lock
+                try:
+                    self._logger.info(f"{consumer_id} is sending lock request to master")
+                    client.send(request_byte)
+                    data = client.recv(ConsumerAutoScaler.MAX_BYTE)
+                    lock_response = LockResponse.model_validate_json(data)
+                    can_lock = lock_response.can_lock
 
-                if not can_lock:
-                    self._logger.info(f"Lock request rejected, retrying in {self._sleep_time} seconds")
-                time.sleep(self._sleep_time)
+                    if not can_lock:
+                        self._logger.info(f"Lock request rejected, retrying in {self._sleep_time} seconds")
+                    time.sleep(self._sleep_time)
+                except Exception as e:
+                    self._logger.error(e)
 
             # assigning partition to consumer
             partition_is_enough = False
@@ -168,6 +172,8 @@ class ConsumerAutoScaler:
                 if not partition_is_enough:
                     self._logger.info(f"Adding {group_id_total_consumer} partition to topic {topic_id}")
                     self._add_partition_on_topic(topic_id, group_id_total_consumer)
+                
+                time.sleep(self._sleep_time)
 
             self._logger.info("Partition is enough, subscribing to topic")
 
@@ -197,9 +203,26 @@ class ConsumerAutoScaler:
                     break
 
                 self._logger.info("Fail connecting, retrying...")
+                time.sleep(self._sleep_time)
             
             unlock_request = UnlockRequest(consumer_id=consumer_id)
-            client.send(unlock_request.model_dump_json().encode())
+
+            is_unlocked = False
+
+            while not is_unlocked:
+                try:
+                    self._logger.info(f"{consumer_id} is sending unlock request to master")
+                    client.send(unlock_request.model_dump_json().encode())
+                    data = client.recv(ConsumerAutoScaler.MAX_BYTE)
+                    unlock_response = UnlockResponse.model_validate_json(data)
+                    is_unlocked = unlock_response.is_unlocked
+                    if not is_unlocked:
+                        self._logger.info(f"Unlock request rejected, retrying in {self._sleep_time} seconds")
+                    time.sleep(self._sleep_time)
+
+                except Exception as e:
+                    self._logger.error(e)
+
             client.close()
 
         except Exception as e:
