@@ -19,8 +19,8 @@ from fogverse.fogverse_logging import get_logger
 
 deploy_scripts = DeployScripts() 
 
-total_consumers = 10
-time_interval = 5
+total_consumers = 2
+time_interval = 30
 send_rate = 0.1 
 consume_rate = 0.5
 initial_partition = 1
@@ -101,7 +101,7 @@ def run_mock_consumer():
 
         kafka_admin = AdminClient(
             conf={
-                "bootstrap.servers": "localhost"
+                "bootstrap.servers": "localhost",
             },
         )
 
@@ -115,7 +115,7 @@ def run_mock_consumer():
             consumer_auto_scaler,
             consumer_extra_config={
                 "auto.offset.reset": "latest",
-                "metadata.max.age.ms": 60_000 # one minute to refresh the metadata
+                "metadata.max.age.ms": 5 * 1000 # 5 seconds to refresh the metadata
             }
         )
 
@@ -159,7 +159,7 @@ async def run_test():
         running_master = create_task(master.run())
         producer = create_task(mock_producer.run())
 
-        while current_consumers <= total_consumers:
+        while current_consumers < total_consumers:
             deploy = deploy_scripts.get_deploy_functions("LOCAL")
             logger = get_logger(name=f"testge-{current_consumers}")
 

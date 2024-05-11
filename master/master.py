@@ -113,6 +113,75 @@ class ConsumerAutoScaler:
 
         return False
 
+    def start_new(self, consumer: Consumer, topic_id: str, group_id: str, consumer_id : int, /, retry_attempt: int=3):
+
+        self._logger.info("Creating topic if not exist")
+        self.topic_id = topic_id
+
+        if not self._topic_exist(topic_id, retry_attempt):
+            topic_created = self._create_topic(topic_id, retry_attempt)
+            if not topic_created:
+                raise Exception("Topic cannot be created")
+
+        partition_is_enough = False
+        current_retry, creating_partitioon_retry = 0, retry_attempt
+
+        # retrying to make sure that concurrent consumer doesnt destroy the whole flow 
+        while not partition_is_enough or current_retry <= creating_partitioon_retry:
+            group_id_total_consumer = self._group_id_total_consumer(group_id) + 1
+            topic_id_total_partition = self._topic_id_total_partition(topic_id)
+
+            self._logger.info(f"\ngroup_id_total_consumer: {group_id_total_consumer}\ntopic_id_total_partition:{topic_id_total_partition}")
+            
+            partition_is_enough = topic_id_total_partition >= group_id_total_consumer # includes itself with plus 1
+            
+            if not partition_is_enough: 
+                self._add_partition_on_topic(topic_id, group_id_total_consumer)
+                current_retry = 0
+            elif partition_is_enough:
+                current_retry += 1
+            
+            time.sleep(self._sleep_time)
+
+
+        # joining consumer group
+        self._logger.info(f"Subscribing to topic {topic_id}")
+
+        consumer.subscribe(
+            topics=[topic_id] 
+        )
+
+        self._logger.info("Waiting for consumer to be assigned on a consumer group")
+
+        while True:
+            consumer_member_id = consumer.memberid() 
+            if consumer.memberid():
+                self._logger.info(f"Consumer assigned to consumer group with id {consumer_member_id}")
+                break
+
+            self._logger.info("Consumer is still not assigned on the consumer group, retrying...")
+            time.sleep(self._sleep_time)
+
+        consumed_message = []
+        
+        # making sure that the consumer gets the partition 
+        while True:
+            
+            message = consumer.poll(1)
+
+            if message:
+                consumed_message.append(message)
+
+                consumer_partition_assignment = consumer.assignment()
+                self.consumer_is_assigned_partition = len(consumer_partition_assignment) != 0
+
+                if self.consumer_is_assigned_partition:
+                    consumer.commit()
+                    self._logger.info(f"Consumer is assigned to {len(consumer_partition_assignment)} partitions, consuming")
+                    return consumed_message
+
+                self._logger.info(f"Fail connecting for consumer id : {consumer_id}, retrying...")
+
     def start(self,
               consumer: Consumer,
               topic_id: str,
@@ -161,7 +230,9 @@ class ConsumerAutoScaler:
                     self._logger.info(f"Adding {group_id_total_consumer} partition to topic {topic_id}")
                     self._add_partition_on_topic(topic_id, group_id_total_consumer)
 
-                message = consumer.poll(self._sleep_time)
+                time.sleep(5)
+
+                message = consumer.poll(1)
 
                 if message:
                     consumed_message.append(message)

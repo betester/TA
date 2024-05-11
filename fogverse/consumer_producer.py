@@ -169,7 +169,7 @@ class ConfluentConsumer:
                     queue.put(message)
 
         except Exception as e:
-            self.log.error(e)
+            print_exc()
 
 
 class ConfluentProducer:
