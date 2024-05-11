@@ -133,10 +133,20 @@ class ConsumerAutoScaler:
 
         client = socket.socket(socket.AF_INET, socket.SOCK_STREAM) 
         try:
+            self._logger.info("Creating topic if not exist")
+            self.topic_id = topic_id
+
+            if not self._topic_exist(topic_id, retry_attempt):
+                topic_created = self._create_topic(topic_id, retry_attempt)
+                if not topic_created:
+                    raise Exception("Topic cannot be created")
+
+            self._logger.info(f"Subscribing to topic {topic_id}")
+
             client.bind((self.master_host, self.master_port))
 
             # acquiring lock from master
-            request = LockRequest(consumer_id=consumer_id)
+            request = LockRequest(lock_consumer_id=consumer_id)
             request_byte = request.model_dump_json().encode()
 
             can_lock = False
@@ -205,7 +215,7 @@ class ConsumerAutoScaler:
                 self._logger.info("Fail connecting, retrying...")
                 time.sleep(self._sleep_time)
             
-            unlock_request = UnlockRequest(consumer_id=consumer_id)
+            unlock_request = UnlockRequest(unlock_consumer_id=consumer_id)
 
             is_unlocked = False
 
