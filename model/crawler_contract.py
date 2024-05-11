@@ -5,6 +5,7 @@ from pydantic import BaseModel
 class CrawlerResponse(BaseModel):
     message: str
     source: str
+    timestamp: float
 
 class Crawler(ABC):
 

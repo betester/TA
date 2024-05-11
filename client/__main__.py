@@ -11,10 +11,10 @@ DEVICE_TOKENS = os.environ.get("DEVICE_TOKENS", "").split(",")
 
 if __name__ == "__main__":
     # get key from env variable
-    key = json.loads(os.environ.get("FIREBASE_KEY"))
+    # key = json.loads(os.environ.get("FIREBASE_KEY"))
 
-    cred = credentials.Certificate(key)
-    firebase_admin.initialize_app(cred)
+    # cred = credentials.Certificate(key)
+    # firebase_admin.initialize_app(cred)
 
     master_component = MasterComponent()
     producer_observer = master_component.producer_observer()
