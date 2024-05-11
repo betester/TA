@@ -51,6 +51,18 @@ class DeployResult(BaseModel):
     machine_id: str
     shut_down_machine: Callable[[], Coroutine[Any, Any, bool]] 
 
+class LockRequest(BaseModel):
+    consumer_id : str
+
+class UnlockRequest(BaseModel):
+    consumer_id : str
+
+class LockResponse(BaseModel):
+    can_lock : bool
+
+class UnlockResponse(BaseModel):
+    is_unlocked: bool
+
 class MasterObserver(ABC):
 
     @abstractmethod
