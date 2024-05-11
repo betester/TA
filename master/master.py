@@ -8,7 +8,7 @@ import socket
 
 from logging import Logger
 from collections.abc import Callable, Coroutine
-from typing import Any, Optional, final
+from typing import Any, Optional
 from aiokafka.client import asyncio
 from confluent_kafka.admin import (
     AdminClient,
