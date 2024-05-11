@@ -52,10 +52,10 @@ class DeployResult(BaseModel):
     shut_down_machine: Callable[[], Coroutine[Any, Any, bool]] 
 
 class LockRequest(BaseModel):
-    consumer_id : str
+    lock_consumer_id : str
 
 class UnlockRequest(BaseModel):
-    consumer_id : str
+    unlock_consumer_id : str
 
 class LockResponse(BaseModel):
     can_lock : bool
@@ -63,7 +63,17 @@ class LockResponse(BaseModel):
 class UnlockResponse(BaseModel):
     is_unlocked: bool
 
-class MasterObserver(ABC):
+class MasterWorker(ABC):
+
+    @abstractmethod
+    async def start(self):
+        pass
+
+    @abstractmethod
+    async def stop(self):
+        pass
+
+class MasterObserver(MasterWorker):
 
     @abstractmethod
     def on_receive(self, data: InputOutputThroughputPair | MachineConditionData):
