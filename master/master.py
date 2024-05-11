@@ -3,6 +3,8 @@ from datetime import datetime, timedelta
 
 import os
 import time
+import socket
+
 
 from logging import Logger
 from collections.abc import Callable, Coroutine
@@ -24,24 +26,33 @@ from fogverse.util import get_timestamp
 from master.contract import (
     DeployArgs,
     DeployResult, 
-    InputOutputThroughputPair, 
+    InputOutputThroughputPair,
+    LockRequest,
+    LockResponse, 
     MachineConditionData, 
     MasterObserver,
     TopicDeployDelay, 
     TopicDeploymentConfig, 
-    TopicStatistic
+    TopicStatistic,
+    UnlockRequest,
+    UnlockResponse
 )
+
 
 class ConsumerAutoScaler:
 
     lock = asyncio.Lock()
     OFFSET_OUT_OF_RANGE = -1001 
+    MAX_BYTE = 1024
     
-    def __init__(self, kafka_admin: AdminClient, sleep_time: int, initial_total_partition: int=1):
+    def __init__(self, kafka_admin: AdminClient, sleep_time: int, master_host : str, master_port : int, initial_total_partition: int=1):
         self._kafka_admin = kafka_admin
         self._sleep_time = sleep_time
         self._initial_total_partition = initial_total_partition
+        self.master_host = master_host
+        self.master_port = master_port
         self.consumer_is_assigned_partition = False
+
 
         self._logger = get_logger(name=self.__class__.__name__)
     
@@ -111,6 +122,134 @@ class ConsumerAutoScaler:
                 time.sleep(self._sleep_time)
 
         return False
+
+    def start_with_distributed_lock(self,
+                                    consumer: Consumer,
+                                    topic_id: str,
+                                    group_id: str,
+                                    consumer_id : str,
+                                    /,
+                                    retry_attempt: int=3):
+
+        client = socket.socket(socket.AF_INET, socket.SOCK_STREAM) 
+        try:
+            self._logger.info("Creating topic if not exist")
+            self.topic_id = topic_id
+
+            if not self._topic_exist(topic_id, retry_attempt):
+                topic_created = self._create_topic(topic_id, retry_attempt)
+                if not topic_created:
+                    raise Exception("Topic cannot be created")
+
+            self._logger.info(f"Subscribing to topic {topic_id}")
+
+            client.connect((self.master_host, self.master_port))
+
+            # acquiring lock from master
+            request = LockRequest(lock_consumer_id=consumer_id)
+            request_byte = request.model_dump_json().encode()
+
+            can_lock = False
+
+            while not can_lock:
+                try:
+                    self._logger.info(f"{consumer_id} is sending lock request to master")
+                    client.sendall(request_byte)
+                    data = client.recv(ConsumerAutoScaler.MAX_BYTE)
+                    lock_response = LockResponse.model_validate_json(data)
+                    can_lock = lock_response.can_lock
+
+                    if not can_lock:
+                        self._logger.info(f"Lock request rejected, retrying in {self._sleep_time} seconds")
+                    time.sleep(self._sleep_time)
+                except Exception as e:
+                    self._logger.error(e)
+
+            # assigning partition to consumer
+            partition_is_enough = False
+            
+            self._logger.info("Checking if partition is enough")
+
+            while not partition_is_enough:
+
+                group_id_total_consumer = self._group_id_total_consumer(group_id) + 1 # including itself
+                topic_id_total_partition = self._topic_id_total_partition(topic_id)
+
+                self._logger.info(f"\ngroup_id_total_consumer: {group_id_total_consumer}\ntopic_id_total_partition:{topic_id_total_partition}")
+
+                partition_is_enough = topic_id_total_partition >= group_id_total_consumer
+
+                if not partition_is_enough:
+                    self._logger.info(f"Adding {group_id_total_consumer} partition to topic {topic_id}")
+                    self._add_partition_on_topic(topic_id, group_id_total_consumer)
+                
+                time.sleep(self._sleep_time)
+
+            self._logger.info("Partition is enough, subscribing to topic")
+
+            consumer.subscribe(
+                topics=[topic_id] 
+            )
+
+            self._logger.info("Waiting for consumer to be assigned on a consumer group")
+
+            while True:
+                consumer_member_id = consumer.memberid() 
+                if consumer.memberid():
+                    self._logger.info(f"Consumer assigned to consumer group with id {consumer_member_id}")
+                    break
+
+                self._logger.info("Consumer is still not assigned on the consumer group, retrying...")
+                time.sleep(self._sleep_time)
+
+            self._logger.info("Waiting for consumer to be assigned on a partition")
+
+            consumed_message = []
+
+            while True:
+
+                message = consumer.poll(self._sleep_time)
+
+                if message:
+                    consumed_message.append(message)
+
+                consumer_partition_assignment = consumer.assignment()
+                self.consumer_is_assigned_partition = len(consumer_partition_assignment) != 0
+
+                if self.consumer_is_assigned_partition:
+                    self._logger.info(f"Consumer is assigned to {len(consumer_partition_assignment)} partitions, consuming")
+                    break
+
+                self._logger.info("Fail connecting, retrying...")
+                time.sleep(self._sleep_time)
+            
+            unlock_request = UnlockRequest(unlock_consumer_id=consumer_id)
+
+            is_unlocked = False
+
+            while not is_unlocked:
+                try:
+                    self._logger.info(f"{consumer_id} is sending unlock request to master")
+                    client.send(unlock_request.model_dump_json().encode())
+                    data = client.recv(ConsumerAutoScaler.MAX_BYTE)
+                    unlock_response = UnlockResponse.model_validate_json(data)
+                    is_unlocked = unlock_response.is_unlocked
+                    if not is_unlocked:
+                        self._logger.info(f"Unlock request rejected, retrying in {self._sleep_time} seconds")
+                    time.sleep(self._sleep_time)
+
+                except Exception as e:
+                    self._logger.error(e)
+
+            client.close()
+            return consumed_message
+
+        except Exception as e:
+            self._logger.error(e)
+
+        finally:
+            client.close()
+
 
     def start(self,
               consumer: Consumer,
