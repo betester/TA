@@ -48,7 +48,7 @@ class CrawlerProducer(Producer, Profiling):
             return CrawlerResponse(
                 message="H" * 10,
                 source="Me",
-                timestamp=str(time.time())
+                timestamp=time.time()
             )
 
         except Exception:

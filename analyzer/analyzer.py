@@ -10,7 +10,7 @@ import torch.nn.functional as F
 class DisasterAnalyzerImpl(DisasterAnalyzer):
 
     def __init__(self, *model_source: Tuple[str, str]):
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.device = torch.device("cpu")
         self._models: dict[str, BertForSequenceClassification] = self._assign_model(*model_source)
         self._tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
         self.__log = get_logger(name=self.__class__.__name__)

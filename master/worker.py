@@ -144,7 +144,6 @@ class ProfillingWorker(MasterObserver):
                         "topic_machine_deployed" : str(self._total_machine_deployed(topic))
                     })
 
-                    self._fogverse_logger.std_log(log)
                     self._fogverse_logger.csv_log(log)
 
                 self._flush()
