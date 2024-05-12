@@ -9,7 +9,7 @@ from master.master import AutoDeployer, ConsumerAutoScaler, DeployScripts, Produ
 from confluent_kafka.admin import AdminClient
 from functools import partial
 
-from master.worker import DynamicPartitionProfillingWorker, InputOutputRatioWorker, ProfillingWorker, StatisticWorker
+from master.worker import DynamicPartitionProfillingWorker, InputOutputRatioWorker, ProfillingWorker, StatisticWorker, DistributedWorkerServerWorker
 from scripts.local_deploy import deploy_instance_with_process
 
 class MasterComponent:
@@ -17,10 +17,14 @@ class MasterComponent:
     def consumer_auto_scaler(self, kafka_admin):
         
         sleep_time = int(str(get_config("SLEEP_TIME", self, 3)))
+        master_host = str(get_config("MASTER_HOST", self, "localhost"))
+        master_port = int(str(get_config("MASTER_PORT", self, 4242)))
 
         return ConsumerAutoScaler(
             kafka_admin=kafka_admin,
-            sleep_time=sleep_time
+            sleep_time=sleep_time,
+            master_host=master_host,
+            master_port=master_port
         )
     
     def producer_observer(self):
@@ -93,6 +97,8 @@ class MasterComponent:
         input_output_refresh_rate = float(str(get_config("INPUT_OUTPUT_REFRESH_RATE", self, 60)))
         profilling_time_window = int(str(get_config("PROFILLING_TIME_WINDOW", self, 1)))
         hearbeart_deploy_delay = int(str(get_config("HEARBEART_DEPLOY_DELAY", self, 120))) # 2 minutes after deployment happens
+        master_host = str(get_config("MASTER_HOST", self, "localhost"))
+        master_port = int(str(get_config("MASTER_PORT", self, 4242)))
 
         statistic_worker = StatisticWorker(maximum_seconds=window_max_second)
         topic_spike_checker = TopicSpikeChecker(statistic_worker)
@@ -129,6 +135,9 @@ class MasterComponent:
 
         consumer_topic = str(get_config("OBSERVER_CONSUMER_TOPIC", self, "observer"))
         consumer_servers = str(get_config("OBSERVER_CONSUMER_SERVERS", self, "localhost:9092"))
+        master_host = str(get_config("MASTER_HOST", self, "localhost"))
+        master_port = int(str(get_config("MASTER_PORT", self, 4242)))
+
         consumer_group_id =group_id 
 
         dynamic_partition_worker = DynamicPartitionProfillingWorker(
@@ -137,7 +146,10 @@ class MasterComponent:
             topic,
             hell_na_consumer_topic
         )
-        workers : list[MasterObserver] = [dynamic_partition_worker]
+
+        distributed_lock_worker = DistributedWorkerServerWorker(master_host=master_host, master_port=master_port)
+
+        workers : list[MasterObserver] = [dynamic_partition_worker, distributed_lock_worker]
 
         return Master(
             consumer_topic=consumer_topic,

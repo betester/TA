@@ -19,7 +19,7 @@ from fogverse.fogverse_logging import get_logger
 
 deploy_scripts = DeployScripts() 
 
-total_consumers = 2
+total_consumers = 5
 time_interval = 30
 send_rate = 0.1 
 consume_rate = 0.5

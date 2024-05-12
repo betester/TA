@@ -150,7 +150,7 @@ class ConfluentConsumer:
     def start_consume(self, queue: queue.Queue, stop_event: Event):
 
         if self.consumer_auto_scaler is not None:
-            self.consumed_messages = self.consumer_auto_scaler.start(
+            self.consumed_messages = self.consumer_auto_scaler.start_with_distributed_lock(
                 self.consumer,
                 self.topics,
                 self.group_id,
