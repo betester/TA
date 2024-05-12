@@ -131,7 +131,10 @@ class MasterComponent:
 
         workers : list[MasterObserver] = [
             profilling_worker,
-            distributed_lock_worker
+            distributed_lock_worker,
+            input_output_worker,
+            statistic_worker,
+            auto_deployer
         ]
 
         return Master(
