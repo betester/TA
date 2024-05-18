@@ -11,8 +11,9 @@ from aiokafka.client import asyncio
 from aiokafka.conn import functools
 from confluent_kafka.admin import AdminClient
 from confluent_kafka import TopicCollection
+from pydantic import BaseModel
 from fogverse.fogverse_logging import FogVerseLogging, get_logger
-from master.contract import DeployArgs, InputOutputThroughputPair, MachineConditionData, MasterObserver, TopicStatistic, LockRequest, LockResponse, UnlockRequest, UnlockResponse
+from master.contract import ConsumerAssignedPartitionEvent, ConsumerRemovedPartitionEvent, DeployArgs, InputOutputThroughputPair, MachineConditionData, MasterObserver, ProfillingExpectedConsumer, TopicStatistic, LockRequest, LockResponse, UnlockRequest, UnlockResponse
 
 class StatisticWorker(MasterObserver, TopicStatistic):
 
@@ -34,8 +35,8 @@ class StatisticWorker(MasterObserver, TopicStatistic):
 
         self._stop = False
 
-    def on_receive(self, data: InputOutputThroughputPair | MachineConditionData):
-        if isinstance(data, InputOutputThroughputPair):
+    def on_receive(self, data):
+        if not isinstance(data, MachineConditionData):
             return
     
         topic_current_count = self._topics_current_count.get(data.target_topic, 0)
@@ -131,14 +132,17 @@ class DynamicPartitionProfillingWorker(MasterObserver):
     
         return message
 
-    def on_receive(self, data: InputOutputThroughputPair | MachineConditionData):
-        if isinstance(data, InputOutputThroughputPair):
+    def on_receive(self, data: BaseModel):
+        if isinstance(data, ConsumerAssignedPartitionEvent):
             self.current_consumer += 1
-        else:
+        if isinstance(data, ConsumerRemovedPartitionEvent):
+            self.current_consumer -= 1
+        if isinstance(data, ProfillingExpectedConsumer):
+            self.expected_consumer = data.expected_consumer
+        if isinstance(data, MachineConditionData):
             if data.target_topic == self.topic:
                 # this basically the main producer
                 self.producer_throughput += data.total_messages
-                self.expected_consumer = data.expected_consumer
             elif data.target_topic == self.consumer_topic:
                 # after received messages from the main producer
                 self.consumer_throughput += data.total_messages
@@ -201,7 +205,7 @@ class ProfillingWorker(MasterObserver):
         self._topics_current_count: dict[str, int] = {} 
         self._stop = False
 
-    def on_receive(self, data: InputOutputThroughputPair | MachineConditionData):
+    def on_receive(self, data: BaseModel):
         if isinstance(data, MachineConditionData):
             topic_current_count = self._topics_current_count.get(data.target_topic, 0)
             topic_current_count += data.total_messages
@@ -305,7 +309,7 @@ class DistributedWorkerServerWorker(MasterObserver):
                 self.request_lock.release()
 
 
-    def on_receive(self, data: InputOutputThroughputPair | MachineConditionData):
+    def on_receive(self, data : BaseModel):
         pass
 
     async def start(self):
@@ -348,13 +352,13 @@ class InputOutputRatioWorker(MasterObserver):
         self._stop = False
         
     
-    def on_receive(self, data: InputOutputThroughputPair | MachineConditionData):
+    def on_receive(self, data: BaseModel):
         if isinstance(data, InputOutputThroughputPair):
             self._logger.info(f"Received input output through pair data: {data}")
             target_topics = self._topics_throughput_pair.get(data.source_topic, [])
             target_topics.append(data.target_topic)
             self._topics_throughput_pair[data.source_topic] = target_topics
-        else:
+        elif isinstance(data, MachineConditionData):
             topic_current_count = self._topics_current_count.get(data.target_topic, 0)
             topic_current_count += data.total_messages
             self._topics_current_count[data.target_topic] = topic_current_count

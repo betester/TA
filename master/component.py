@@ -2,6 +2,9 @@
 from os import chmod
 from uuid import uuid4
 from logging import Logger
+from aiokafka import AIOKafkaProducer
+
+from confluent_kafka import Producer
 from fogverse.util import get_config
 from master.contract import DeployResult, MasterObserver, TopicDeploymentConfig
 from master.event_handler import Master
@@ -29,7 +32,8 @@ class MasterComponent:
     
     def producer_observer(self):
         observer_topic = str(get_config("OBSERVER_TOPIC", self, "observer"))
-        return ProducerObserver(observer_topic)
+        kafka_server = str(get_config("OBSERVER_SERVER", self, "localhost"))
+        return ProducerObserver(observer_topic, kafka_server)
 
     def parse_dict_to_docker_env(self, container_env: dict):
         docker_container_env = ""
@@ -131,7 +135,7 @@ class MasterComponent:
             observers=workers
         )
     
-    def dynamic_partition_master_observer(self, hell_na_consumer_topic : str, topic: str, admin_client : AdminClient, profilling_time_window: int, group_id : str):
+    def dynamic_partition_master_observer(self, hell_na_consumer_topic : str, topic: str, admin_client : AdminClient, profilling_time_window: float, group_id : str):
 
         consumer_topic = str(get_config("OBSERVER_CONSUMER_TOPIC", self, "observer"))
         consumer_servers = str(get_config("OBSERVER_CONSUMER_SERVERS", self, "localhost:9092"))

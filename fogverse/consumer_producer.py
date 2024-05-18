@@ -118,6 +118,7 @@ class ConfluentConsumer:
                  group_id: str,
                  consumer_id : str,
                  consumer_auto_scaler,
+                 producer_observer,
                  consumer_extra_config: dict={},
                  poll_time=1.0,
                  batch_size: int = 1,
@@ -129,23 +130,36 @@ class ConfluentConsumer:
         self.batch_size = batch_size
         self.consumer_auto_scaler = consumer_auto_scaler
         self.consumer_id = consumer_id
+        self.consumed_messages = None
+
+        self.current_assigned_partition = 0
 
         self.consumer = Consumer({
             **consumer_extra_config,
             "bootstrap.servers": kafka_server,
             "group.id": group_id
         })
-
+        self.producer_observer = producer_observer
 
 
         self.log = get_logger(name=self.__class__.__name__)
 
-    def _populate_queue_with_consumed_message(self, queue: queue.Queue):
-        if not self.consumed_messages:
-            return queue.put(None)
+    def on_partition_assigned(self, _, partition):
 
-        for consumed_message in self.consumed_messages:
-            queue.put(consumed_message)
+        if self.current_assigned_partition == 0 and len(partition) != 0:
+            self.producer_observer.send_consumer_join_event(len(partition))
+        if self.current_assigned_partition != 0 and len(partition) == 0:
+            self.producer_observer.send_consumer_leave_event(len(partition))
+        
+        self.current_assigned_partition = len(partition)
+        self.log.info(f"{self.consumer_id} assigned {len(partition)} partition")
+
+    def on_partition_lost(self, _, partition):
+        self.producer_observer.send_consumer_leave_event(len(partition))
+
+        self.current_assigned_partition = len(partition)
+        self.log.info(f"{self.consumer_id} disconnected")
+        
 
     def start_consume(self, queue: queue.Queue, stop_event: Event):
 
@@ -154,21 +168,25 @@ class ConfluentConsumer:
                 self.consumer,
                 self.topics,
                 self.group_id,
-                self.consumer_id
+                self.consumer_id,
+                self.on_partition_assigned,
+                self.on_partition_lost,
             )
 
         else:
-            self.consumer.subscribe([self.topics])
-
-        self._populate_queue_with_consumed_message(queue)
+            self.consumer.subscribe([self.topics], 
+                                    on_assign=self.on_partition_assigned,
+                                    on_lost=self.on_partition_lost)
 
         try:
             while not stop_event.is_set():
                 messages: list[Message] = self.consumer.consume(self.batch_size, self.poll_time)
-                for message in messages:
-                    queue.put(message)
 
-        except Exception as e:
+                if self.current_assigned_partition > 0:
+                    for message in messages:
+                        queue.put(message)
+
+        except Exception:
             print_exc()
 
 
@@ -178,8 +196,7 @@ class ConfluentProducer:
                  topic: str,
                  kafka_server: str,
                  processor: Processor,
-                 start_producer_callback : Callable[[Callable[[str, bytes], Any]], Any],
-                 on_complete: Callable[[str, int, int, Callable[[str, bytes], Any]], None],
+                 producer_observer,
                  producer_extra_config: dict={},
                  batch_size: int = 1):
         
@@ -188,15 +205,11 @@ class ConfluentProducer:
             "bootstrap.servers": kafka_server
         })
         self.processor = processor
+        self.producer_observer = producer_observer
 
         self.topic = topic
         self.queue = queue
-
         self.batch_size = batch_size
-        self._callback_is_called = False
-
-        self.start_producer_callback = start_producer_callback
-        self.producer_on_complete = on_complete
 
         self.log = get_logger(name=self.__class__.__name__)
     
@@ -205,17 +218,11 @@ class ConfluentProducer:
         try:
             message_batch: list[Message] = []
             while not stop_event.is_set():
+
                 message: Message = queue.get()
 
-                if self.start_producer_callback and not self._callback_is_called:
-                    self._callback_is_called = True
-                    self.start_producer_callback(lambda x, y: self.producer.produce(topic=x, value=y))
-                
-                if message is None:
+                if message is None or message.error():
                     continue
-
-                elif message.error():
-                    self.log.error(message.error())
 
                 message_batch.append(message)
 
@@ -223,25 +230,21 @@ class ConfluentProducer:
                     continue
 
                 else:
-                    total_messages = len(message_batch)
                     results: list[bytes] = self.processor.process(message_batch)
                     for result in results:
                         self.producer.produce(topic=self.topic, value=result)
                         self.producer.flush()
+
+                    self.producer_observer.send_total_successful_messages(
+                        self.topic,
+                        len(message_batch)
+                    )
+
                     queue.task_done()
                     message_batch.clear()
 
-                    self.producer_on_complete(
-                        self.topic,
-                        total_messages,
-                        0,
-                        lambda x, y: self.producer.produce(
-                            topic=x,
-                            value=y
-                        )
-                    )
 
-        except Exception as e: 
+        except Exception: 
             print_exc()
 
 

@@ -1,7 +1,15 @@
 from aiokafka.client import asyncio
+from pydantic import BaseModel
 from fogverse import Consumer
 from fogverse.fogverse_logging import get_logger
-from master.contract import InputOutputThroughputPair, MachineConditionData, MasterObserver
+from master.contract import (
+    ConsumerAssignedPartitionEvent,
+    ConsumerRemovedPartitionEvent,
+    InputOutputThroughputPair,
+    MachineConditionData,
+    MasterObserver,
+    ProfillingExpectedConsumer
+)
 
 
 class Master(Consumer):
@@ -17,20 +25,31 @@ class Master(Consumer):
         self.group_id = consumer_group_id
         self._log = get_logger(name=self.__class__.__name__)
 
+        self.possible_data_types : list[type[BaseModel]] = [
+            InputOutputThroughputPair,
+            MachineConditionData,
+            ConsumerRemovedPartitionEvent,
+            ConsumerAssignedPartitionEvent,
+            ProfillingExpectedConsumer
+        ]
+
         self.auto_decode = False
 
         self._closed = False
         self._observers = observers
         Consumer.__init__(self)
         
-    def decode(self, data: bytes) -> InputOutputThroughputPair | MachineConditionData:
-        try:
-            return InputOutputThroughputPair.model_validate_json(data, strict=True)
-        except Exception:
-            return MachineConditionData.model_validate_json(data, strict=True)
+    def decode(self, data: bytes):
+        for data_types in self.possible_data_types:
+            try:
+                return data_types.model_validate_json(data, strict=True)
+            except:
+                continue
+        self._log.error(f"Not a valid request {data}")
+        return None
+
     
-    
-    async def process(self, data: InputOutputThroughputPair | MachineConditionData):
+    async def process(self, data: BaseModel):
         for observer in self._observers:
             observer.on_receive(data)
 

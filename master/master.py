@@ -20,10 +20,13 @@ from confluent_kafka.admin import (
 )
 from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
 from asyncio.subprocess import PIPE, STDOUT 
-from confluent_kafka import Consumer, KafkaException, Message, TopicCollection
+from confluent_kafka import Consumer, KafkaException, Message, Producer, TopicCollection
+from pydantic import BaseModel
 from fogverse.fogverse_logging import get_logger
 from fogverse.util import get_timestamp
 from master.contract import (
+    ConsumerAssignedPartitionEvent,
+    ConsumerRemovedPartitionEvent,
     DeployArgs,
     DeployResult, 
     LockRequest,
@@ -31,6 +34,7 @@ from master.contract import (
     InputOutputThroughputPair, 
     MachineConditionData, 
     MasterObserver,
+    ProfillingExpectedConsumer,
     TopicDeployDelay, 
     TopicDeploymentConfig, 
     TopicStatistic,
@@ -45,7 +49,12 @@ class ConsumerAutoScaler:
     MAX_BYTE = 1024
 
     
-    def __init__(self, kafka_admin: AdminClient, sleep_time: int, master_host : str, master_port : int, initial_total_partition: int=1):
+    def __init__(self, 
+                 kafka_admin: AdminClient,
+                 sleep_time: int,
+                 master_host : str,
+                 master_port : int,
+                 initial_total_partition: int=1):
         self._kafka_admin = kafka_admin
         self._sleep_time = sleep_time
         self._initial_total_partition = initial_total_partition
@@ -127,6 +136,8 @@ class ConsumerAutoScaler:
                                     topic_id: str,
                                     group_id: str,
                                     consumer_id : str,
+                                    on_partition_assigned,
+                                    on_partition_lost,
                                     /,
                                     retry_attempt: int=3):
 
@@ -187,7 +198,9 @@ class ConsumerAutoScaler:
             self._logger.info("Partition is enough, subscribing to topic")
 
             consumer.subscribe(
-                topics=[topic_id] 
+                topics=[topic_id],
+                on_assign=on_partition_assigned,
+                on_lost=on_partition_lost
             )
 
             self._logger.info("Waiting for consumer to be assigned on a consumer group")
@@ -448,68 +461,66 @@ class ConsumerAutoScaler:
 
 class ProducerObserver:
 
-    def __init__(self, producer_topic: str):
+    def __init__(self, producer_topic: str, kafka_server : str):
+
+        self.producer = Producer({
+            "bootstrap.servers": kafka_server
+        })
+
         self._producer_topic = producer_topic 
         self._logger = get_logger(name=self.__class__.__name__)
+        
 
-    def send_input_output_ratio_pair(self, source_topic: str, target_topic: str, topic_configs: Optional[TopicDeploymentConfig], send: Callable[[str, bytes], Any]):
+    def send_input_output_ratio_pair(self,
+                                     source_topic: str,
+                                     target_topic: str,
+                                     topic_configs: Optional[TopicDeploymentConfig]):
         '''
         Identify which topic pair should the observer ratio with
         send: a produce function from kafka
         '''
         self._logger.info(f"Sending input output ratio to topic {self._producer_topic}")
         if source_topic is not None:
-            return send(
-                self._producer_topic,
-                self._input_output_pair_data_format(
-                    source_topic,
-                    target_topic,
-                    topic_configs
-                )
-            )
-    
-    async def send_total_successful_messages_async(
-            self,
-            target_topic: str,
-            total_messages: int,
-            expected_consumer :int ,
-            send: Callable[[str, bytes], Any]
-        ):
-        if target_topic is not None:
-            data = self._success_timestamp_data_format(target_topic, total_messages, expected_consumer)
-            return await send(
-                self._producer_topic,
-                data
-            )
 
+            data = InputOutputThroughputPair(
+                source_topic=source_topic, 
+                target_topic=target_topic, 
+                deploy_configs=topic_configs
+            ).model_dump_json().encode()
+
+            self.producer.produce(topic=self._producer_topic, value=data)
+    
     def send_total_successful_messages(
             self,
             target_topic: str,
-            total_messages: int,
-            expected_consumer: int,
-            send: Callable[[str, bytes], Any]
+            total_messages: int
         ):
         if target_topic is not None:
-            data = self._success_timestamp_data_format(target_topic, total_messages, expected_consumer)
-            return send(
-                self._producer_topic,
-                data
-            )
 
-    def _input_output_pair_data_format(self, source_topic, target_topic: str, deploy_configs: Optional[TopicDeploymentConfig]):
-        return InputOutputThroughputPair(
-            source_topic=source_topic,
-            target_topic=target_topic,
-            deploy_configs=deploy_configs
-        ).model_dump_json().encode()
-        
-    def _success_timestamp_data_format(self, target_topic: str, total_messages: int, expected_consumer : int):
-        return MachineConditionData(
-            target_topic=target_topic,
-            total_messages=total_messages,
-            timestamp=int(get_timestamp().timestamp()),
-            expected_consumer=expected_consumer
-        ).model_dump_json().encode()
+            data = MachineConditionData(
+                target_topic=target_topic,
+                total_messages=total_messages,
+                timestamp=int(get_timestamp().timestamp()),
+            ).model_dump_json().encode()
+
+            self.producer.produce(topic=self._producer_topic, value=data)
+            self.producer.flush()
+
+    def send_consumer_join_event(self, gained_partition : int):
+        data = ConsumerAssignedPartitionEvent(assigned_partition=gained_partition).model_dump_json().encode()
+        self.producer.produce(topic=self._producer_topic, value=data)
+        self.producer.flush()
+
+
+    def send_consumer_leave_event(self, lost_partition : int):
+        data = ConsumerRemovedPartitionEvent(removed_partition=lost_partition).model_dump_json().encode()
+        self.producer.produce(topic=self._producer_topic, value=data)
+        self.producer.flush()
+
+    def send_expected_consumer(self, expected_consumer):
+        data = ProfillingExpectedConsumer(expected_consumer=expected_consumer).model_dump_json().encode()
+        self.producer.produce(topic=self._producer_topic, value=data)
+        self.producer.flush()
 
 class DeployScripts:
 
@@ -626,8 +637,8 @@ class AutoDeployer(MasterObserver):
             if not delay_task.done():
                 delay_task.cancel()
 
-    def on_receive(self, data: InputOutputThroughputPair | MachineConditionData):
-        if isinstance(data, MachineConditionData):
+    def on_receive(self, data: BaseModel):
+        if not isinstance(data, InputOutputThroughputPair):
             return
         
         if data.deploy_configs:

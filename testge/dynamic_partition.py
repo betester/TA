@@ -19,11 +19,16 @@ from fogverse.fogverse_logging import get_logger
 
 deploy_scripts = DeployScripts() 
 
-total_consumers = 5
-time_interval = 30
-send_rate = 0.1 
+# skenario 1 : 10 konsumer 30 detik   
+# skenario 2 : 10 konsumer 1 detik   
+# skenario 3 : 3 konsumer 1 detik   
+# skenario 4 : 3 konsumer 30 detik   
+
+total_consumers = 10
+time_interval = 5
+send_rate = 0.02 # 50 messages per second
 consume_rate = 0.5
-initial_partition = 1
+initial_partition = 2
 current_consumers = 0 
 
 from confluent_kafka.admin import (
@@ -64,11 +69,12 @@ class MockSender(Producer):
 
     async def send(self, data, topic=None, key=None, headers=None, callback=None):
         result = await super().send(data, topic, key, headers, callback)
-        await producer_observer.send_total_successful_messages_async(
+        producer_observer.send_total_successful_messages(
             target_topic=self.producer_topic,
-            total_messages=1,
-            expected_consumer=current_consumers,
-            send=self.producer.send
+            total_messages=1
+        )
+        producer_observer.send_expected_consumer(
+            expected_consumer=current_consumers
         )
 
         return result
@@ -106,13 +112,15 @@ def run_mock_consumer():
         )
 
         consumer_auto_scaler = master_component.consumer_auto_scaler(kafka_admin)
+        producer_observer = master_component.producer_observer()
 
         mock_consumer = ConfluentConsumer(
             topic,
             kafka_server,
             group_id,
             str(uuid4()),
-            consumer_auto_scaler,
+            None,
+            producer_observer,
             consumer_extra_config={
                 "auto.offset.reset": "latest",
                 "metadata.max.age.ms": 5 * 1000 # 5 seconds to refresh the metadata
@@ -123,8 +131,7 @@ def run_mock_consumer():
             consumer_topic, 
             kafka_server,
             mock_processor,
-            start_producer_callback,
-            producer_observer.send_total_successful_messages
+            producer_observer
         )
 
         parallel_runnable = ParallelRunnable(
@@ -165,6 +172,15 @@ async def run_test():
 
             result = await deploy(
                 TopicDeploymentConfig(
+                    max_instance=1,
+                    topic_id=topic,
+                    project_name="test",
+                    image_name="test",
+                    zone="test",
+                    service_account="test",
+                    image_env={"env": "ye"},
+                    machine_type="type",
+                    provider="provider",
                     service_name="testge --type=dp --extra=consume"
                 ),
                 logger

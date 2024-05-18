@@ -1,5 +1,6 @@
 from typing import Optional
 from aiokafka.conn import functools
+from transformers.utils.hub import uuid4
 from analyzer.processor import AnalyzerProcessor
 from fogverse.consumer_producer import ConfluentConsumer, ConfluentProducer
 from fogverse.general import ParallelRunnable
@@ -100,6 +101,8 @@ class AnalyzerComponent:
 
         consumer = ConfluentConsumer(
             topics=self._consumer_topic,
+            consumer_id=str(uuid4()),
+            producer_observer=producer_observer,
             kafka_server=self._consumer_servers,
             group_id=self._consumer_group_id,
             consumer_auto_scaler=consumer_auto_scaler,
@@ -121,20 +124,10 @@ class AnalyzerComponent:
             provider=self._cloud_provider
         )
 
-        start_producer_callback = functools.partial(
-            producer_observer.send_input_output_ratio_pair,
-            self._consumer_topic,
-            self._producer_topic,
-            topic_deployment_config
-        )
-
-
         producer = ConfluentProducer(
             topic=self._producer_topic,
             kafka_server=self._producer_servers,
             processor=analyzer_processor,
-            start_producer_callback=start_producer_callback,
-            on_complete=producer_observer.send_total_successful_messages
         )
 
         runnable = ParallelRunnable(

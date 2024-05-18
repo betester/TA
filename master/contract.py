@@ -18,19 +18,18 @@ class MachineConditionData(BaseModel):
     target_topic: str
     timestamp: int
     total_messages: int
-    expected_consumer: int
 
 class TopicDeploymentConfig(BaseModel):
-    max_instance: Optional[int] = None
-    topic_id: Optional[str] = None
-    project_name: Optional[str] = None
-    service_name: Optional[str] = None
-    image_name: Optional[str] = None
-    zone: Optional[str] = None
-    service_account: Optional[str] = None
-    image_env: Optional[dict]  = None
-    machine_type: Optional[str] = None
-    provider: Optional[str] = None
+    max_instance: int  
+    topic_id: str 
+    project_name: str
+    service_name: str
+    image_name: str
+    zone: str
+    service_account: str
+    image_env: dict
+    machine_type: str
+    provider: str
 
 class InputOutputThroughputPair(BaseModel):
     source_topic: str
@@ -53,10 +52,19 @@ class DeployResult(BaseModel):
     machine_id: str
     shut_down_machine: Callable[[], Coroutine[Any, Any, bool]] 
 
+class ConsumerAssignedPartitionEvent(BaseModel):
+    assigned_partition: int
+
+class ConsumerRemovedPartitionEvent(BaseModel):
+    removed_partition: int
+
+class ProfillingExpectedConsumer(BaseModel):
+    expected_consumer: int
+
 class MasterObserver(ABC):
 
     @abstractmethod
-    def on_receive(self, data: InputOutputThroughputPair | MachineConditionData):
+    def on_receive(self, data: BaseModel):
         pass
 
     @abstractmethod
