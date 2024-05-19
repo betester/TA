@@ -1,13 +1,12 @@
 
-import time
 
 from traceback import print_exc
 
-from functools import partial
-from confluent_kafka import Message
-from asyncio import create_task, gather, sleep
+from asyncio import create_task, sleep, gather
 from confluent_kafka.admin import AdminClient, NewTopic
 from transformers.utils.hub import uuid4
+from analyzer.analyzer import DisasterAnalyzerImpl
+from analyzer.processor import AnalyzerProcessor
 from fogverse import Producer
 from fogverse.base import Processor
 from fogverse.consumer_producer import ConfluentConsumer, ConfluentProducer
@@ -16,6 +15,8 @@ from master.component import MasterComponent
 from master.contract import TopicDeploymentConfig
 from master.master import DeployScripts
 from fogverse.fogverse_logging import get_logger
+from analyzer.component import AnalyzerComponent
+from model.crawler_contract import CrawlerResponse
 
 deploy_scripts = DeployScripts() 
 
@@ -26,7 +27,7 @@ deploy_scripts = DeployScripts()
 
 total_consumers = 10
 time_interval = 5
-send_rate = 0.02 # 50 messages per second
+send_rate = 0.01 # 50 messages per second
 consume_rate = 0.5
 initial_partition = 2
 current_consumers = 0 
@@ -41,77 +42,74 @@ kafka_server = "localhost:9092"
 consumer_topic = "cleint"
 
 master_component = MasterComponent()
-
-kafka_admin = AdminClient(
-    conf={
-        "bootstrap.servers": "localhost"
-    },
-)
-
-master = master_component.dynamic_partition_master_observer(consumer_topic, topic, kafka_admin, 1, "not related")
-producer_observer = master_component.producer_observer()
+analyzer_component = AnalyzerComponent()
 
 class MockSender(Producer):
 
-    def __init__(self):
+    def __init__(self, producer_observer):
         self.producer_servers = kafka_server
         self.producer_topic = topic
         self.producer_conf = {
                 "metadata_max_age_ms": 5 * 1000 # 5 seconds to refresh the metadata
         }
+        self.producer_observer = producer_observer
         self._closed = False
 
         Producer.__init__(self)
 
     async def receive(self):
         await sleep(send_rate)
-        return "mocking message" 
+        return CrawlerResponse(
+            message="help fire happens in toronto",
+            source="BBC"
+        )  
+
+    def encode(self, data):
+        return CrawlerResponse.model_dump_json(data).encode()
 
     async def send(self, data, topic=None, key=None, headers=None, callback=None):
         result = await super().send(data, topic, key, headers, callback)
-        producer_observer.send_total_successful_messages(
+        self.producer_observer.send_total_successful_messages(
             target_topic=self.producer_topic,
             total_messages=1
         )
-        producer_observer.send_expected_consumer(
+        self.producer_observer.send_expected_consumer(
             expected_consumer=current_consumers
         )
 
         return result
 
-mock_producer = MockSender()
 
 class MockProcessor(Processor):
 
-    def process(self, messages: list[Message]) -> list[bytes]:
+    def process(self, messages: list[bytes]) -> list[bytes]:
         processed_msg : list[bytes] = [] 
 
-        time.sleep(consume_rate)
+        x = 0
+
+        for i in range(1_000_000):
+            x += ((x + i) % 1129)  * 1227
 
         for message in messages:
-            msg_val = message.value()
+            msg_val = message
             processed_msg.append(msg_val)
 
         return processed_msg
 
-mock_processor = MockProcessor()
 
-start_producer_callback =partial(
-    producer_observer.send_input_output_ratio_pair,
-    topic,
-    "",
-    None
-)
 
-def run_mock_consumer():
+def run_mock_consumer(extra_args):
 
-        kafka_admin = AdminClient(
-            conf={
-                "bootstrap.servers": "localhost",
-            },
-        )
+        mock_processor = MockProcessor()
 
-        consumer_auto_scaler = master_component.consumer_auto_scaler(kafka_admin)
+        if extra_args == "GPU":
+            disaster_analyzer = DisasterAnalyzerImpl(
+                ("is_disaster", "./mocking_bird")
+            )
+            mock_processor = AnalyzerProcessor(disaster_analyzer)
+
+        total_producer = int(input("max process size: "))
+
         producer_observer = master_component.producer_observer()
 
         mock_consumer = ConfluentConsumer(
@@ -131,7 +129,8 @@ def run_mock_consumer():
             consumer_topic, 
             kafka_server,
             mock_processor,
-            producer_observer
+            producer_observer,
+            max_process_size=total_producer
         )
 
         parallel_runnable = ParallelRunnable(
@@ -142,12 +141,31 @@ def run_mock_consumer():
 
         parallel_runnable.run()
 
-async def run_test():
+async def run_multithreading_test():
+
+    running_node = []
+
+    master = master_component.multithreading_master()
+    producer_observer = master_component.producer_observer()
+
+    mock_producer = MockSender(producer_observer)
+
+    running_node.append(create_task(mock_producer.run()))
+    running_node.append(create_task(master.run()))
+
+    await gather(*running_node)
+    
+async def run_dynamic_partition_test():
 
     global current_consumers
     running_consumers = []
     deleted_topic = [topic, 'observer']
 
+    kafka_admin = AdminClient(
+        conf={
+            "bootstrap.servers": "localhost"
+        },
+    )
 
     try:
         print(f"Deleting topic {deleted_topic}")
@@ -162,7 +180,13 @@ async def run_test():
 
     await sleep(2)
 
+    producer_observer = master_component.producer_observer()
+    mock_producer = MockSender(producer_observer)
+
     try:
+
+        master = master_component.dynamic_partition_master_observer(consumer_topic, topic, kafka_admin, 1, "not related")
+
         running_master = create_task(master.run())
         producer = create_task(mock_producer.run())
 

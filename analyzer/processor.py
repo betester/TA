@@ -11,17 +11,16 @@ class AnalyzerProcessor(Processor):
         self.analyzer = disaster_analyzer
         self.logger = get_logger()
 
-    def process(self, messages: list[Message]) -> list[bytes]:
+    def process(self, messages: list[bytes]) -> list[bytes]:
         try:
-            crawler_results = list(map(lambda message : CrawlerResponse.model_validate_json(message.value()).message, messages))
+            crawler_results = list(map(lambda message : CrawlerResponse.model_validate_json(message).message, messages))
             disaster_messages = self.analyzer.analyze("is_disaster", crawler_results)
-            keyword_messages = self.analyzer.analyze("keyword", crawler_results)
 
             return [
                 DisasterAnalyzerResponse(
                     text=crawler_results[i],
                     is_disaster=disaster_messages[i],
-                    keyword=keyword_messages[i]
+                    keyword=""
                 ).model_dump_json().encode() 
                 for i in range(len(crawler_results)
             )]

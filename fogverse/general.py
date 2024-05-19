@@ -3,7 +3,7 @@ from collections.abc import Callable
 from contextvars import ContextVar
 from threading import Event
 import time
-from concurrent.futures import ThreadPoolExecutor, wait
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, wait
 import queue
 import traceback
 from typing import Any, Optional
@@ -132,7 +132,7 @@ class ParallelRunnable:
             ]
 
             while True:
-                time.sleep(10)
+                time.sleep(1)
 
         except KeyboardInterrupt:
             stop_event.set()

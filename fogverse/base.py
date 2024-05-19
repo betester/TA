@@ -49,7 +49,7 @@ class AbstractConsumer:
 class Processor(ABC):
 
     @abstractmethod
-    def process(self, messages: list[Message]) -> list[bytes]:
+    def process(self, messages: list[bytes]) -> list[bytes]:
         pass
 
 class AbstractProducer:

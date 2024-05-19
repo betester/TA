@@ -1,7 +1,7 @@
 
 import argparse
 from asyncio import get_event_loop
-from testge.dynamic_partition import run_mock_consumer, run_test
+from testge.testge import run_mock_consumer, run_dynamic_partition_test, run_multithreading_test
 
 
 async def main():
@@ -13,9 +13,14 @@ async def main():
 
     if args.type == 'dp':
         if args.extra == 'consume':
-            run_mock_consumer()
+            run_mock_consumer(None)
         else:
-            await run_test()
+            await run_dynamic_partition_test()
+    if args.type == 'mt':
+        if args.extra != None:
+            run_mock_consumer(args.extra)
+        else:
+            await run_multithreading_test()
 
 if __name__ == "__main__":
     loop = get_event_loop()

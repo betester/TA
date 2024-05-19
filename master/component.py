@@ -134,6 +134,27 @@ class MasterComponent:
             consumer_servers=consumer_servers,
             observers=workers
         )
+
+    def multithreading_master(self):
+
+        consumer_topic = str(get_config("OBSERVER_CONSUMER_TOPIC", self, "observer"))
+        consumer_servers = str(get_config("OBSERVER_CONSUMER_SERVERS", self, "localhost:9092"))
+        group_id = "master"
+
+        profilling_worker = ProfillingWorker(
+            lambda _ : 0,
+            1
+        )
+
+        master = Master(
+            consumer_topic=consumer_topic,
+            consumer_group_id=group_id,
+            consumer_servers=consumer_servers,
+            observers=[profilling_worker]
+        )
+
+        return master
+
     
     def dynamic_partition_master_observer(self, hell_na_consumer_topic : str, topic: str, admin_client : AdminClient, profilling_time_window: float, group_id : str):
 

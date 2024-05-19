@@ -90,7 +90,7 @@ class AnalyzerComponent:
 
         return analyzer_producer
     
-    def parallel_disaster_analyzer(self, consumer_auto_scaler: ConsumerAutoScaler, producer_observer: ProducerObserver):
+    def parallel_disaster_analyzer(self, consumer_auto_scaler: Optional[ConsumerAutoScaler], producer_observer: ProducerObserver):
 
         disaster_analyzers = DisasterAnalyzerImpl(
             self._disaster_classifier_model_source,
@@ -128,14 +128,13 @@ class AnalyzerComponent:
             topic=self._producer_topic,
             kafka_server=self._producer_servers,
             processor=analyzer_processor,
+            producer_observer=producer_observer
         )
 
-        runnable = ParallelRunnable(
+        return ParallelRunnable(
             consumer,
             producer,
             None,
             total_producer=5
         )
-
-        return ParallelAnalyzerJobService(runnable)
 

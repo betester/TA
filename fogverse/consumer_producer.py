@@ -1,12 +1,15 @@
-import asyncio
-from collections.abc import Callable
-from threading import Event
-import socket
-import sys
-from traceback import print_exc
-from typing import Any
+
 import uuid
 import queue
+import asyncio
+import socket
+import sys
+import multiprocessing as mp
+
+
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
+from threading import Event
+from traceback import print_exc
 
 from aiokafka import (
     AIOKafkaConsumer as _AIOKafkaConsumer,
@@ -195,10 +198,11 @@ class ConfluentProducer:
     def __init__(self, 
                  topic: str,
                  kafka_server: str,
-                 processor: Processor,
+                 processor : Processor,
                  producer_observer,
+                 max_process_size=1,
                  producer_extra_config: dict={},
-                 batch_size: int = 1):
+                 batch_size: int=1):
         
         self.producer = Producer({
             **producer_extra_config,
@@ -208,44 +212,62 @@ class ConfluentProducer:
         self.producer_observer = producer_observer
 
         self.topic = topic
-        self.queue = queue
         self.batch_size = batch_size
+        self.max_process_size = max_process_size
+        self.processing_pool = ProcessPoolExecutor(max_process_size, mp_context=mp.get_context('spawn'))
+        self.thread_pool = ThreadPoolExecutor(max_process_size)
 
         self.log = get_logger(name=self.__class__.__name__)
-    
-    def start_produce(self, queue: queue.Queue, stop_event: Event):
 
+    def __offload_to_process(self, message_batch: list[Message], queue):
+        try:
+            message_values = [m.value() for m in message_batch]
+            future = self.processing_pool.submit(self.processor.process, message_values)
+            results = future.result()
+
+            self.__send_data(results)
+
+        except Exception as e:
+            self.log.error(e)
+        finally:
+            queue.task_done()
+            message_batch.clear()
+
+    def __send_data(self, results):
+        for result in results:
+            self.producer.produce(topic=self.topic, value=result)
+
+        self.producer_observer.send_total_successful_messages(self.topic, len(results))
+        self.producer.flush()
+
+    def start_produce(self, queue: queue.Queue, stop_event: Event):
         try:
             message_batch: list[Message] = []
             while not stop_event.is_set():
-
                 message: Message = queue.get()
 
                 if message is None or message.error():
+                    self.log.error(f"Error in message: {message.error()}")
+                    queue.task_done()
                     continue
 
                 message_batch.append(message)
+                if len(message_batch) >= self.batch_size:
+                    if self.max_process_size != 1:
+                        self.thread_pool.submit(self.__offload_to_process, message_batch, queue)
+                    else:
+                        message_values = [m.value() for m in message_batch]
+                        result = self.processor.process(message_values)
+                        self.__send_data(result)
 
-                if len(message_batch) < self.batch_size:
-                    continue
+                    message_batch = []
 
-                else:
-                    results: list[bytes] = self.processor.process(message_batch)
-                    for result in results:
-                        self.producer.produce(topic=self.topic, value=result)
-                        self.producer.flush()
-
-                    self.producer_observer.send_total_successful_messages(
-                        self.topic,
-                        len(message_batch)
-                    )
-
-                    queue.task_done()
-                    message_batch.clear()
-
-
-        except Exception: 
+        except Exception:
             print_exc()
+        finally:
+            self.processing_pool.shutdown(wait=True)
+            self.thread_pool.shutdown(wait=True)
+            self.producer.flush()
 
 
 def _get_cv_video_capture(device=0):
