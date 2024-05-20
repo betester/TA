@@ -33,6 +33,11 @@ class AnalyzerComponent:
         self._kafka_admin_account = str(get_config("KAFKA_ADMIN_HOST", self, "localhost"))
         self._analyzer_mode = str(get_config("ANALYZER_MODE", self, "parallel"))
 
+        # consumer auto scaler config
+        self.master_host = str(get_config("MASTER_HOST", self, "master.asia-southeast1-b.c.personal-project-408003.internal"))
+        self.master_port =  int(str(get_config("MASTER_PORT", self, 4242)))
+
+
         self._container_env = {
             "MACHINE_TYPE": self._machine_type,
             "MAX_INSTANCE": self._max_instance,
@@ -50,7 +55,9 @@ class AnalyzerComponent:
             "IMAGE_NAME" : self._image_name,
             "SERVICE_ACCOUNT" : self._service_account,
             "KAFKA_ADMIN_HOST" : self._kafka_admin_account,
-            "ANALYZER_MODE" : self._analyzer_mode
+            "ANALYZER_MODE" : self._analyzer_mode,
+            "MASTER_HOST": self.master_host,
+            "MASTER_PORT": self.master_port,
         }
 
 
