@@ -48,11 +48,6 @@ class NotificationConsumer(Consumer):
         if int(data.is_disaster):
             try:
                 self.__client.send_notification(data.text)
-                await self._observer.send_total_successful_messages(
-                    target_topic=self.producer_topic,
-                    send = lambda x, y: self.producer.send(topic=x, value=y),
-                    total_messages = 1
-                )
             except Exception as e:
                 self.__log.error(f"Error sending notification: {e}")
 
