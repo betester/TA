@@ -246,8 +246,6 @@ class InputOutputRatioWorker(MasterObserver):
         '''
 
         assert refresh_rate_second > 0
-        assert input_output_ratio_threshold > 0
-        assert input_output_ratio_threshold <= 1
         
         self._refresh_rate_second = refresh_rate_second
         self._input_output_ratio_threshold = input_output_ratio_threshold
