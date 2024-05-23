@@ -16,7 +16,11 @@ class CrawlerProducer(Producer, Profiling):
                  crawler: Crawler,
                  observer: ProducerObserver,
                  metadata_max_age_ms: int,
-                 crawler_delay : float
+                 crawler_delay : float,
+                 spam_delay : float= 600, 
+                 spam_duration: float= 60,
+                 spam_rate : float = 0.01,
+                 use_spam: int = 0
                  ):
         # kafka args
         self.producer_topic = producer_topic 
@@ -24,6 +28,10 @@ class CrawlerProducer(Producer, Profiling):
         self._crawler = crawler
         self.group_id = consumer_group_id
         self.crawler_delay = crawler_delay
+
+        self.spam_delay =  spam_delay
+        self.spam_duration = spam_duration
+        self.spam_rate = spam_rate
 
         self.producer_conf = {
             'metadata_max_age_ms' : metadata_max_age_ms
@@ -38,6 +46,18 @@ class CrawlerProducer(Producer, Profiling):
         self.__log = get_logger(name=self.__class__.__name__)
         self._observer = observer
 
+        if use_spam:
+            asyncio.create_task(self.spam())
+
+    async def spam(self):
+        self.__log.info("Initiating spam")
+        await asyncio.sleep(self.spam_delay)
+        self.__log.info("Starting spam")
+        old_value = self.crawler_delay 
+        self.crawler_delay = self.spam_rate
+        await asyncio.sleep(self.spam_duration)
+        self.__log.info("Terminating spam")
+        self.crawler_delay = old_value
 
     async def receive(self):
         try:

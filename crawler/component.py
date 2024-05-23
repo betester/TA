@@ -18,6 +18,12 @@ class CrawlerComponent:
         self._metadata_max_age_ms = int(str(get_config("METADATA_MAX_AGE_MS", self, 5000)))
         self._crawler_delay = float(str(get_config("CRAWLER_DELAY", self, 0.1)))
 
+        self._spam_delay = float(str(get_config("SPAM_DELAY", self, 600)))
+        self._spam_rate = float(str(get_config("SPAM_RATE", self, 0.01)))
+        self._spam_duration = float(str(get_config("SPAM_DURATION", self, 60)))
+
+        self._use_spam = int(str(get_config("USE_SPAM", self, 0)))
+
     def __kaggle_parser(self, row: list[str]) -> CrawlerResponse:
         return CrawlerResponse(
             message=row[3],
@@ -44,5 +50,8 @@ class CrawlerComponent:
             crawler=crawler,
             observer=observer,
             metadata_max_age_ms=self._metadata_max_age_ms,
-            crawler_delay=self._crawler_delay
+            crawler_delay=self._crawler_delay,
+            spam_delay=self._spam_delay,
+            spam_rate=self._spam_rate,
+            spam_duration=self._spam_duration
         )
