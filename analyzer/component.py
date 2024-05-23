@@ -1,3 +1,4 @@
+import queue
 from typing import Optional
 from aiokafka.conn import functools
 from analyzer.processor import AnalyzerProcessor
@@ -37,6 +38,9 @@ class AnalyzerComponent:
         self.master_host = str(get_config("MASTER_HOST", self, "master.asia-southeast1-b.c.personal-project-408003.internal"))
         self.master_port =  int(str(get_config("MASTER_PORT", self, 4242)))
 
+        # max queue size
+        self.max_queue = int(str(get_config("MAX_QUEUE", self, 100))
+)
 
         self._container_env = {
             "MACHINE_TYPE": self._machine_type,
@@ -147,7 +151,7 @@ class AnalyzerComponent:
         runnable = ParallelRunnable(
             consumer,
             producer,
-            None,
+            queue.Queue(self.max_queue),
         )
 
         return ParallelAnalyzerJobService(runnable)
