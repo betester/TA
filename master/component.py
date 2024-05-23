@@ -1,4 +1,5 @@
 
+from json import loads
 from os import chmod
 from uuid import uuid4
 from logging import Logger
@@ -11,6 +12,7 @@ from functools import partial
 
 from master.worker import DistributedWorkerServerWorker, InputOutputRatioWorker, ProfillingWorker, StatisticWorker
 from scripts.local_deploy import deploy_instance_with_process
+
 class MasterComponent:
 
     def consumer_auto_scaler(self):
@@ -105,6 +107,7 @@ class MasterComponent:
         hearbeart_deploy_delay = int(str(get_config("HEARBEART_DEPLOY_DELAY", self, 120))) # 2 minutes after deployment happens
         master_host = str(get_config("MASTER_HOST", self, "localhost"))
         master_port = int(str(get_config("MASTER_PORT", self, 4242)))
+        included_worker : list[str] = loads(str(get_config("WORKERS", self, "[]")))
 
         statistic_worker = StatisticWorker(maximum_seconds=window_max_second)
         topic_spike_checker = TopicSpikeChecker(statistic_worker)
@@ -129,17 +132,19 @@ class MasterComponent:
         profilling_worker = ProfillingWorker(auto_deployer.get_topic_total_machine, profilling_time_window)
         distributed_lock_worker = DistributedWorkerServerWorker(master_host=master_host, master_port=master_port)
 
-        workers : list[MasterObserver] = [
-            profilling_worker,
-            distributed_lock_worker,
-            input_output_worker,
-            statistic_worker,
-            auto_deployer
-        ]
+        available_workers : dict[str, MasterObserver] = {
+            "PROFILLING_WORKER":  profilling_worker,
+            "DISTRIBUTED_LOCK_WORKER" : distributed_lock_worker,
+            "INPUT_OUTPUT_WORKER" :input_output_worker,
+            "STATISTIC_WORKER" : statistic_worker,
+            "AUTO_DEPLOYER":auto_deployer
+        }
+
+        used_worker : list[MasterObserver] = list(map(lambda w : available_workers[w], included_worker))
 
         return Master(
             consumer_topic=consumer_topic,
             consumer_group_id=consumer_group_id,
             consumer_servers=consumer_servers,
-            observers=workers
+            observers=used_worker
         )
