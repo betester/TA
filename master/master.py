@@ -662,7 +662,7 @@ class TopicSpikeChecker:
         self._topic_statistic = topic_statistic
         self._logger = get_logger(name=self.__class__.__name__)
 
-    def check_spike_by_z_value(self, z_threshold: int, topic_id: str, topic_throughput: float) -> bool:
+    def check_spike_by_z_value(self, z_threshold: float, topic_id: str, topic_throughput: float) -> bool:
         self._logger.info(f"Checking if topic {topic_id} is a spike or not")
         std = self._topic_statistic.get_topic_standard_deviation(topic_id)
         mean = self._topic_statistic.get_topic_mean(topic_id)
