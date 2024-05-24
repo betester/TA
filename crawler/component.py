@@ -53,5 +53,6 @@ class CrawlerComponent:
             crawler_delay=self._crawler_delay,
             spam_delay=self._spam_delay,
             spam_rate=self._spam_rate,
-            spam_duration=self._spam_duration
+            spam_duration=self._spam_duration,
+            use_spam=self._use_spam
         )
