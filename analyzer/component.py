@@ -35,7 +35,7 @@ class AnalyzerComponent:
         self._analyzer_mode = str(get_config("ANALYZER_MODE", self, "parallel"))
 
         # consumer auto scaler config
-        self.master_host = str(get_config("MASTER_HOST", self, "master.asia-southeast1-b.c.personal-project-408003.internal"))
+        self.master_host = str(get_config("MASTER_HOST", self, "localhost:9092"))
         self.master_port =  int(str(get_config("MASTER_PORT", self, 4242)))
 
         # max queue size

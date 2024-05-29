@@ -46,6 +46,9 @@ def callback():
 @handler.add(MessageEvent, message=TextMessage)
 def handle_message(event):
     text = event.message.text
+    
+    reply = f"You said: {text}"
+    line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
 
     producer.send(topic="analyzer", data=CrawlerResponse(message = text, source="MOKE", timestamp=time.time).model_dump_json().encode())
     producer_observer.send_total_successful_messages(
@@ -56,8 +59,6 @@ def handle_message(event):
             value=y
         )
     )
-    reply = f"You said: {text}"
-    line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
 
 if __name__ == "__main__":
     port = int(os.environ.get('PORT', 8080))
