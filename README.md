@@ -197,6 +197,7 @@ return result
 ## Components of The System
 ### Discord Bot
 ### Line Bot
+### Crawler
 ### Analyzer
 ### Client
-### Crawler
+### Receiver
