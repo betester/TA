@@ -1,0 +1,3 @@
+[submodule "TA-Mobile"]
+	path = TA-Mobile
+	url = https://github.com/veloraine/TA-Mobile
