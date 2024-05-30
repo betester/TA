@@ -222,6 +222,7 @@ class ConfluentProducer:
                     continue
 
                 else:
+                    #TODO: tambahin decoder step in here probably?
                     total_messages = len(message_batch)
                     results: list[bytes] = self.processor.process(message_batch)
                     for result in results:

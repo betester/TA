@@ -3,12 +3,16 @@ from collections.abc import Callable
 from contextvars import ContextVar
 from threading import Event
 import time
-from concurrent.futures import ThreadPoolExecutor, wait
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, wait
 import queue
 import traceback
-from typing import Any, Optional
+import multiprocessing as mp
+from typing import Optional
+
 
 from confluent_kafka import Producer
+
+from fogverse.base import Processor
 
 from .consumer_producer import ConfluentConsumer, ConfluentProducer
 
@@ -46,6 +50,7 @@ class Runnable:
 
     async def run(self):
         try:
+
             await _call_func_async(self, '_before_start')
             await self._start()
             await _call_func_async(self, '_after_start')
@@ -87,6 +92,92 @@ class Runnable:
             _call_func(self, '_before_close')
             await self._close()
             _call_func(self, '_after_close')
+
+class ParallelRunnableV2:
+
+    def on_error(self, _):
+        traceback.print_exc()
+
+    async def _start(self):
+        if getattr(self, '_started', False) == True: return
+        await _call_func_async(self, 'start_consumer')
+        await _call_func_async(self, 'start_producer')
+        self._started = True
+
+    async def _close(self):
+        if getattr(self, '_closed', False) == True: return
+        await _call_func_async(self, 'close_producer')
+        await _call_func_async(self, 'close_consumer')
+        self._closed = True
+
+    async def __offload_to_processor(self, loop : asyncio.AbstractEventLoop , data):
+        _call_func(self, '_before_process', args=(data,))
+
+        process__ : Optional[Processor] = getattr(self, 'processor', None)
+
+        assert process__ != None
+
+        results = await loop.run_in_executor(self.processor_pool, process__.process, [data])
+
+        _call_func(self, '_after_process', args=(results,))
+
+        _call_func(self, '_before_encode', args=(results,))
+        result_bytes =[self.encode(result) for result in results] 
+        _call_func(self, '_after_encode', args=(result_bytes,))
+
+        _call_func(self, '_before_send', args=(result_bytes,))
+        for result_byte in result_bytes:
+            await self.send(result_byte)
+        _call_func(self, '_after_send', args=(result_bytes,))
+
+    async def run(self, num_of_process : int, max_task : int):
+
+        self.processor_pool = ProcessPoolExecutor(num_of_process, mp_context=mp.get_context('spawn'))
+        loop = asyncio.get_event_loop()
+        running_tasks = []
+
+        if not getattr(self, 'processor', None):
+            raise Exception("Must inject processor for this to run")
+
+        try:
+            await _call_func_async(self, '_before_start')
+            await self._start()
+            await _call_func_async(self, '_after_start')
+            while not self._closed:
+
+                if len(running_tasks) > max_task:
+                    await asyncio.gather(*running_tasks)
+                    # let the garbage collector do it aight
+                    running_tasks = []
+
+                _call_func(self, '_before_receive')
+                self.message = await self.receive()
+                if self.message is None: continue
+                _call_func(self, '_after_receive', args=(self.message,))
+
+                # kafka and opencv consumer compatibility
+                getvalue = getattr(self.message, 'value', None)
+                if getvalue is None:
+                    value = self.message
+                elif callable(getvalue):
+                    value = self.message.value()
+                else:
+                    value = self.message.value
+
+                _call_func(self, '_before_decode', args=(value,))
+                data = self.decode(value)
+                _call_func(self, '_after_decode', args=(data,))
+                new_task = asyncio.create_task(self.__offload_to_processor(loop, data))
+                running_tasks.append(new_task)
+
+        except Exception as e:
+            self.on_error(e)
+        finally:
+            _call_func(self, '_before_close')
+            await self._close()
+            _call_func(self, '_after_close')
+
+
 
 class ParallelRunnable:
 

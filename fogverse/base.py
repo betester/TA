@@ -1,6 +1,7 @@
 
 from abc import ABC, abstractmethod
 from collections.abc import Callable
+from typing import Any
 from confluent_kafka import Message
 import asyncio
 import numpy as np
@@ -49,7 +50,7 @@ class AbstractConsumer:
 class Processor(ABC):
 
     @abstractmethod
-    def process(self, messages: list[Message]) -> list[bytes]:
+    def process(self, data: list[Any]) -> list[Any]:
         pass
 
 class AbstractProducer:

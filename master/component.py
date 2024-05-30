@@ -99,7 +99,7 @@ class MasterComponent:
         consumer_servers = str(get_config("OBSERVER_CONSUMER_SERVERS", self, "localhost:9092"))
         consumer_group_id = str(get_config("OBSERVER_CONSUMER_GROUP_ID", self, "observer"))
         deploy_delay = int(str(get_config("DEPLOY_DELAY", self, 900))) # 15 minutes over the next deployment
-        z_value = float(str(get_config("Z_VALUE", self, 3)))
+        z_value = float(str(get_config("Z_VALUE", self, 1.5)))
         window_max_second = int(str(get_config("WINDOW_MAX_SECOND", self, 300))) # 5 minutes default
         input_output_ratio_threshold = float(str(get_config("INPUT_OUTPUT_RATIO_THRESHOLD", self, 0.7)))
         input_output_refresh_rate = float(str(get_config("INPUT_OUTPUT_REFRESH_RATE", self, 60)))

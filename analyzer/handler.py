@@ -2,17 +2,22 @@ import socket
 import time
 
 from analyzer import DisasterAnalyzer
+from fogverse.base import Processor
 from fogverse.general import ParallelRunnable
 from master.contract import TopicDeploymentConfig
 from master.master import ConsumerAutoScaler, ProducerObserver
 from model.analyzer_contract import DisasterAnalyzerResponse
 from model.crawler_contract import CrawlerResponse
-from fogverse import Producer, Consumer
+from fogverse import ParallelConsumer, ParallelProducer
 from fogverse.fogverse_logging import get_logger
 from typing import Optional
+from asyncio import sleep, create_task
 
+import torch.multiprocessing
 
-class AnalyzerProducer(Consumer, Producer):
+torch.multiprocessing.set_sharing_strategy('file_system')
+
+class AnalyzerProducer(ParallelConsumer, ParallelProducer):
 
     def __init__(self, 
                  producer_topic: str, 
@@ -23,7 +28,8 @@ class AnalyzerProducer(Consumer, Producer):
                  classifier_model: DisasterAnalyzer,
                  consumer_auto_scaler: Optional[ConsumerAutoScaler],
                  producer_observer: ProducerObserver,
-                 topic_deployment_config: TopicDeploymentConfig
+                 topic_deployment_config: TopicDeploymentConfig,
+                 analyzer_processor : Processor
                 ):
 
         self.consumer_topic =  consumer_topic
@@ -35,13 +41,16 @@ class AnalyzerProducer(Consumer, Producer):
         self._log = get_logger(name=self.__class__.__name__)
         self.auto_decode = False
 
-        Producer.__init__(self)
-        Consumer.__init__(self)
+        ParallelProducer.__init__(self)
+        ParallelConsumer.__init__(self)
 
+        self.processor = analyzer_processor
         self._topic_deployment_config = topic_deployment_config
         self._consumer_auto_scaler = consumer_auto_scaler
         self._observer = producer_observer
         self._closed = False
+
+        self.send_rate = 0.1
 
         self.client_id = socket.gethostname()
 
@@ -51,6 +60,21 @@ class AnalyzerProducer(Consumer, Producer):
         
     def encode(self,data: DisasterAnalyzerResponse) -> bytes:
         return data.model_dump_json().encode()
+
+    async def slow_down(self):
+
+        slow_down_delay : int = 600
+        slow_down_rate  : float = 0.5
+        slow_down_duration : int = 60
+        self._log.info("Inititating slow down")
+        await sleep(slow_down_delay)
+        self._log.info("Slowing down")
+        previous_rate = self.send_rate
+        self.send_rate = slow_down_rate
+        await sleep(slow_down_duration)
+        self._log.info("Slowing down finished")
+        self.send_rate = previous_rate
+
 
     async def _start(self):
         if self._consumer_auto_scaler:
@@ -70,31 +94,8 @@ class AnalyzerProducer(Consumer, Producer):
             send = lambda x, y: self.producer.send(topic=x, value=y)
         )
 
+        create_task(self.slow_down())
 
-    async def process(self, data: CrawlerResponse):
-        try:
-            message_is_disaster = self._classifier_model.analyze("is_disaster", [data.message])[0]
-            if message_is_disaster == "0":
-                return DisasterAnalyzerResponse(
-                    is_disaster=message_is_disaster,
-                    text=data.message,
-                    crawler_timestamp=data.timestamp,
-                    analyzer_timestamp=time.time()
-                )
-
-            keyword_result = self._classifier_model.analyze("keyword", [data.message])
-
-            if keyword_result:
-                return DisasterAnalyzerResponse(
-                    keyword=keyword_result[0],
-                    is_disaster=message_is_disaster,
-                    text=data.message,
-                    crawler_timestamp=data.timestamp,
-                    analyzer_timestamp=time.time()
-                )
-
-        except Exception as e:
-            self._log.error(e)
 
     async def send(self, data, topic=None, key=None, headers=None, callback=None):
         result = await super().send(data, topic, key, headers, callback)

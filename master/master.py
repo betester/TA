@@ -506,7 +506,7 @@ class AutoDeployer(MasterObserver):
     def __init__(
             self,
             deploy_script: DeployScripts,
-            should_be_deployed : Callable[[str, float] ,bool],
+            should_be_deployed : Callable[[str, float, bool] ,bool],
             deploy_delay: int,
             after_heartbeat_delay : int 
         ):
@@ -612,10 +612,15 @@ class AutoDeployer(MasterObserver):
                     )
                     return False
 
-                source_topic_is_not_spike = self._should_be_deployed(source_topic, source_total_calls)
-                target_topic_is_not_spike = self._should_be_deployed(target_topic, target_total_calls) 
+                source_topic_is_spike = self._should_be_deployed(source_topic, source_total_calls, False) # sebelah kanan harusnya
+                target_topic_is_spike = self._should_be_deployed(target_topic, target_total_calls, True)  # sebelah kiri harusnya
+                # 1 1 -> dont
+                # 1 0 -> dont
+                # 0 0 -> yes
+                # 0 1 -> dont
 
-                if source_topic_is_not_spike and target_topic_is_not_spike:
+
+                if not source_topic_is_spike and not target_topic_is_spike:
                     self._logger.info(f"Deploying new machine for service {service_name} to cloud provider: {provider}")
 
                     machine_deployer = self._deploy_scripts.get_deploy_functions(
@@ -662,7 +667,7 @@ class TopicSpikeChecker:
         self._topic_statistic = topic_statistic
         self._logger = get_logger(name=self.__class__.__name__)
 
-    def check_spike_by_z_value(self, z_threshold: float, topic_id: str, topic_throughput: float) -> bool:
+    def check_spike_by_z_value(self, z_threshold: float, topic_id: str, topic_throughput: float, left_side : bool) -> bool:
         self._logger.info(f"Checking if topic {topic_id} is a spike or not")
         std = self._topic_statistic.get_topic_standard_deviation(topic_id)
         mean = self._topic_statistic.get_topic_mean(topic_id)
@@ -670,5 +675,15 @@ class TopicSpikeChecker:
 
         self._logger.info(f"Topic {topic_id} statistics:\nMean: {mean}\nStandard Deviation: {std}\nZ-Score:{z_score}")
             
-        self._logger.info(f"{z_score < z_threshold}")
-        return z_score < z_threshold
+
+        if left_side:
+            # checks if it's less than lower bound thershold 
+            self._logger.info(f"Sebelah kiri: {left_side}")
+            self._logger.info(f"{z_score} <= {-z_threshold}")
+            return z_score <= -z_threshold
+        else:
+            # checks if it's bigger than upper bound threshold
+            self._logger.info(f"Sebelah kanan: {not left_side}")
+            self._logger.info(f"{z_score} >= {z_threshold}")
+            return z_score >= z_threshold
+

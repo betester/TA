@@ -86,6 +86,8 @@ class AnalyzerComponent:
             provider=self._cloud_provider
         )
 
+        analyzer_processor = AnalyzerProcessor(disaster_analyzers)
+
         analyzer_producer = AnalyzerProducer(
             producer_topic=self._producer_topic,
             producer_servers=self._producer_servers, 
@@ -95,7 +97,8 @@ class AnalyzerComponent:
             consumer_group_id=self._consumer_group_id,
             consumer_auto_scaler=consumer_auto_scaler,
             producer_observer=producer_observer,
-            topic_deployment_config=topic_deployment_config
+            topic_deployment_config=topic_deployment_config,
+            analyzer_processor=analyzer_processor
         )
 
         return analyzer_producer
