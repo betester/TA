@@ -3,8 +3,12 @@ from fogverse import Consumer, Profiling, get_timestamp
 from fogverse.fogverse_logging import get_logger
 import json
 
+@DeprecationWarning
 class Observer(Consumer, Profiling):
-        
+    """
+    Experimental class to observe the messages from the client_v6 and analyze topics
+    """
+
     def __init__(self):
         self.consumer_topic =  ["client_v6", "analyze"]
         self.consumer_servers = "localhost:9092"

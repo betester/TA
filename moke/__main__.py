@@ -21,6 +21,7 @@ _producer_conf = {
 
 producer = Producer(**_producer_conf)
 
+topic = os.environ.get("MOKE_PRODUCER_TOPIC", "")
 
 CHANNEL_SECRET = os.environ.get("CHANNEL_SECRET", "")
 CHANNEL_ACCESS_TOKEN = os.environ.get("CHANNEL_ACCESS_TOKEN", "")
@@ -50,7 +51,7 @@ def handle_message(event):
     reply = f"You said: {text}"
     line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
 
-    producer.send(topic="analyzer", data=CrawlerResponse(message = text, source="MOKE", timestamp=time.time).model_dump_json().encode())
+    producer.send(topic=topic, data=CrawlerResponse(message = text, source="MOKE", timestamp=time.time).model_dump_json().encode())
     producer_observer.send_total_successful_messages(
         "analyzer",
         1,

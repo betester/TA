@@ -29,7 +29,7 @@ class AnalyzerComponent:
         self._machine_type = str(get_config("MACHINE_TYPE", self, "CPU"))
         self._project_name = str(get_config("PROJECT_NAME", self, "")) 
         self._service_name = str(get_config("SERVICE_NAME", self, "analyzer"))
-        self._image_name = str(get_config("IMAGE_NAME", self, "betester/analyzer:latest"))
+        self._image_name = str(get_config("IMAGE_NAME", self, ""))
         self._service_account = str(get_config("SERVICE_ACCOUNT", self, ""))
         self._kafka_admin_account = str(get_config("KAFKA_ADMIN_HOST", self, "localhost"))
         self._analyzer_mode = str(get_config("ANALYZER_MODE", self, "parallel"))
